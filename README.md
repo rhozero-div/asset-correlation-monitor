@@ -2,11 +2,17 @@
 
 A web-based macroeconomic asset allocation and correlation monitor. It tracks 11 key ETFs across equities, bonds, and commodities, calculating rolling correlations, volatility, returns, and detecting anomaly signals (Z-scores) to guide portfolio allocation.
 
+> **Acknowledgments**
+> The core analytical framework and asset allocation insights implemented in this project were inspired by the excellent discussions on the [《面基》播客 (Episode: 6a097340e1eb34a9398d4dc9)](https://www.xiaoyuzhoufm.com/episode/6a097340e1eb34a9398d4dc9).
+
+## Live Demo
+🚀 **[https://asset-correlation-monitor.pages.dev](https://asset-correlation-monitor.pages.dev)**
+
 ## Architecture
 
-*   **Backend**: Python, FastAPI, Pandas, yfinance
-*   **Frontend**: Next.js 14, React, Tailwind CSS, Recharts, Plotly.js
-*   **Data**: Daily adjusted close prices cached locally in CSV format.
+*   **Backend**: Python, FastAPI, Pandas, yfinance (Hosted on Hugging Face Spaces Docker)
+*   **Frontend**: Next.js 14, React, Tailwind CSS, Recharts, Plotly.js (Hosted on Cloudflare Pages)
+*   **Data**: Daily adjusted close prices cached locally. Features an intelligent anti-abuse refresh mechanism that checks the latest market date to avoid unnecessary full downloads and rate limits.
 
 ## Features
 
@@ -15,7 +21,7 @@ A web-based macroeconomic asset allocation and correlation monitor. It tracks 11
 *   **Anomaly Signals**: Z-Score based alerting for ETF pairs diverging from historical norms.
 *   **Insights Panel**: Auto-generated regime notes and allocation suggestions based on current correlations.
 
-## Setup
+## Local Setup
 
 ### 1. Backend
 
@@ -34,7 +40,7 @@ cd frontend
 npm install
 ```
 
-## Running the App
+## Running Locally
 
 You can start both the backend and frontend simultaneously using the provided script:
 
