@@ -3,7 +3,19 @@
 import dynamic from "next/dynamic";
 import { MatrixResponse } from "@/lib/types";
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+// Load plotly basic/cartesian dynamically to avoid 28MB bundle size
+const Plot = dynamic(() => 
+  Promise.all([
+    import("react-plotly.js/factory"),
+    // @ts-expect-error - no types available for this specific dist
+    import("plotly.js-cartesian-dist")
+  ]).then(([factoryModule, plotlyModule]) => {
+    const createPlotComponent = factoryModule.default;
+    const Plotly = plotlyModule.default || plotlyModule;
+    return createPlotComponent(Plotly);
+  }), 
+  { ssr: false }
+);
 
 export default function CorrelationHeatmap({
   recent,
