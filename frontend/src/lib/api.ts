@@ -3,7 +3,7 @@ import {
   MatrixResponse, AnomalySignal, InsightResponse 
 } from "./types";
 
-const API_BASE = "http://localhost:8012/api/v1/analysis";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8012/api/v1/analysis";
 
 export async function refreshData(): Promise<RefreshResponse> {
   const res = await fetch(`${API_BASE}/refresh`, { method: "POST" });
