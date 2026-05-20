@@ -1,0 +1,17 @@
+name: Keep Hugging Face Space Alive
+
+on:
+  schedule:
+    # Run every day at 00:00 UTC (which is 8:00 AM Beijing time or 20:00 ET)
+    # Just needs to run at least once every 48 hours to prevent the space from sleeping
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Health Endpoint
+        run: |
+          echo "Pinging Hugging Face Space to keep it awake..."
+          curl -f -s https://rhozero-div-asset-correlation-monitor.hf.space/api/v1/health || echo "Failed to ping, but will try again next time"
