@@ -11,10 +11,11 @@ router = APIRouter(prefix="/api/v1/analysis", tags=["Analysis"])
 
 @router.post("/refresh", response_model=RefreshResponse)
 def refresh_data():
-    data_service.refresh_data()
+    updated = data_service.refresh_data()
+    msg = "Data refreshed successfully" if updated else "Data is already up-to-date"
     return RefreshResponse(
         status="success", 
-        message="Data refreshed successfully",
+        message=msg,
         last_date=data_service.get_last_date()
     )
 
