@@ -29,7 +29,7 @@ jobs:
           git config --global user.name "github-actions[bot]"
           
           # Clone the HF space to a temp folder
-          git clone https://user:$HF_TOKEN@huggingface.co/spaces/rhozero-div/asset-correlation-api hf_space
+          git clone https://user:$HF_TOKEN@huggingface.co/spaces/rhozero-div/asset-correlation-monitor hf_space
           
           # Copy everything from backend to the HF space root
           cp -r backend/* hf_space/
@@ -39,4 +39,4 @@ jobs:
           cd hf_space
           git add .
           git commit -m "Auto-deploy backend from GitHub Actions" || echo "No changes to commit"
-          git push https://user:$HF_TOKEN@huggingface.co/spaces/rhozero-div/asset-correlation-api main
+          git push https://user:$HF_TOKEN@huggingface.co/spaces/rhozero-div/asset-correlation-monitor main
