@@ -3,7 +3,7 @@
 A web-based macroeconomic asset allocation and correlation monitor. It tracks 11 key ETFs across equities, bonds, and commodities, calculating rolling correlations, volatility, returns, and detecting anomaly signals (Z-scores) to guide portfolio allocation.
 
 > **Acknowledgments**
-> The core analytical framework and asset allocation insights implemented in this project were inspired by the excellent discussions on the [《面基》播客 (Episode: 6a097340e1eb34a9398d4dc9)](https://www.xiaoyuzhoufm.com/episode/6a097340e1eb34a9398d4dc9).
+> The core analytical framework and asset allocation insights implemented in this project were inspired by the excellent discussions on the [《面基》播客 (资产配置与有效前沿：去找更好的，更不一样的，更贴近时代的)](https://www.xiaoyuzhoufm.com/episode/6a097340e1eb34a9398d4dc9).
 
 ## Live Demo
 🚀 **[https://asset-correlation-monitor.pages.dev](https://asset-correlation-monitor.pages.dev)**
