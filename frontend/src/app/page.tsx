@@ -220,7 +220,12 @@ export default function Dashboard() {
             
             {activeTab === "rolling" && (
               <div className="space-y-6">
-                <RollingTimeSeries corrData={data.rollingCorr} volData={data.rollingVol} />
+                <RollingTimeSeries
+                  key={activeGroup}
+                  corrData={data.rollingCorr}
+                  volData={data.rollingVol}
+                  tickers={data.summary.map(s => s.ticker)}
+                />
               </div>
             )}
             
