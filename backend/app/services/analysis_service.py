@@ -2,10 +2,93 @@ import pandas as pd
 import numpy as np
 from typing import List, Dict, Tuple, Optional
 from .data_service import data_service
+from .kalman import garch_standardize, compute_obs, kalman_filter_1d
+
 
 class AnalysisService:
+    SENSITIVITY_CONFIG = {
+        "fast": {"Q": 0.01, "label": "Fast (高敏)"},
+        "standard": {"Q": 0.005, "label": "Standard (基准)"},
+        "smooth": {"Q": 0.0001, "label": "Smooth (平滑)"},
+    }
+    KALMAN_R = 0.5
+
     def __init__(self):
-        pass
+        self._garch_ready = False
+        self._garch_warnings: List[str] = []
+        self._garch_std: Dict[str, pd.Series] = {}
+        self._garch_vol: Dict[str, pd.Series] = {}
+        self._kalman_matrices: Dict[str, pd.DataFrame] = {}
+        self._kalman_series: Dict[str, Dict[Tuple[str, str], pd.Series]] = {}
+
+    # ------------------------------------------------------------------ #
+    #  GARCH + Kalman pre-computation
+    # ------------------------------------------------------------------ #
+
+    def _ensure_garch(self):
+        if self._garch_ready:
+            return
+        print("Running GARCH(1,1) standardization for all tickers...")
+        returns = self._get_returns("all")
+        self._garch_warnings = []
+        for ticker in returns.columns:
+            std, vol, warn = garch_standardize(returns[ticker])
+            self._garch_std[ticker] = std
+            self._garch_vol[ticker] = vol
+            if warn:
+                self._garch_warnings.append(f"[{ticker}] {warn}")
+        for w in self._garch_warnings:
+            print(f"  GARCH: {w}")
+        self._garch_ready = True
+
+    def _ensure_kalman(self):
+        if self._kalman_matrices:
+            return
+        self._ensure_garch()
+        print("Running Kalman filter for all sensitivity levels...")
+        all_tickers = [t for t in data_service.get_tickers_for_group("all") if t in self._garch_std]
+        n = len(all_tickers)
+        if n < 2:
+            return
+
+        for sensitivity, config in self.SENSITIVITY_CONFIG.items():
+            Q = config["Q"]
+            matrix = pd.DataFrame(np.eye(n), index=all_tickers, columns=all_tickers)
+            series: Dict[Tuple[str, str], pd.Series] = {}
+
+            for i in range(n):
+                for j in range(i + 1, n):
+                    t1, t2 = all_tickers[i], all_tickers[j]
+                    obs = compute_obs(self._garch_std[t1], self._garch_std[t2])
+                    if len(obs) < 10:
+                        continue
+                    hist_corr = float(self._garch_std[t1].corr(self._garch_std[t2]))
+                    if np.isnan(hist_corr):
+                        hist_corr = 0.0
+                    rho = kalman_filter_1d(
+                        obs.values, Q=Q, R=self.KALMAN_R,
+                        rho_init=float(hist_corr), P_init=0.1,
+                    )
+                    rho_series = pd.Series(rho, index=obs.index)
+                    series[(t1, t2)] = rho_series
+                    matrix.loc[t1, t2] = matrix.loc[t2, t1] = rho[-1]
+
+            self._kalman_matrices[sensitivity] = matrix
+            self._kalman_series[sensitivity] = series
+            print(f"  Kalman [{sensitivity}] (Q={Q}): {len(series)} pairs computed")
+
+    def invalidate_kalman(self):
+        """Call after data refresh so Kalman gets recomputed."""
+        self._garch_ready = False
+        self._garch_std.clear()
+        self._garch_vol.clear()
+        self._garch_warnings.clear()
+        self._kalman_matrices.clear()
+        self._kalman_series.clear()
+
+    # ------------------------------------------------------------------ #
+    #  Returns helper (shared, no window)
+    # ------------------------------------------------------------------ #
 
     def _get_returns(self, group: str = "all") -> pd.DataFrame:
         df = data_service.load_data()
@@ -13,12 +96,15 @@ class AnalysisService:
         tickers = [t for t in tickers if t in df.columns]
         df = df[tickers]
         returns = df.pct_change(fill_method=None)
-        # Drop tickers that have zero valid return data (yfinance glitch)
         valid = [c for c in returns.columns if returns[c].notna().sum() > 0]
         dropped = set(returns.columns) - set(valid)
         if dropped:
             print(f"Dropped tickers with no return data: {dropped}")
         return returns[valid].dropna(how='all')
+
+    # ------------------------------------------------------------------ #
+    #  Public API methods
+    # ------------------------------------------------------------------ #
 
     def get_summary_stats(self, group: str = "all") -> List[Dict]:
         tickers = data_service.get_tickers_for_group(group)
@@ -31,11 +117,13 @@ class AnalysisService:
 
         for ticker in df.columns:
             series = df[ticker].dropna()
-            if series.empty: continue
+            if series.empty:
+                continue
 
             def get_cagr(start_date, end_date, start_val, end_val):
                 days = (end_date - start_date).days
-                if days < 30 or start_val <= 0: return None
+                if days < 30 or start_val <= 0:
+                    return None
                 years = days / 365.25
                 return (end_val / start_val) ** (1 / years) - 1
 
@@ -72,181 +160,156 @@ class AnalysisService:
                 "cagr_5y": cagr_5y,
                 "cagr_all": cagr_all,
                 "vol_all": vol_all,
-                "max_dd_all": max_dd
+                "max_dd_all": max_dd,
             })
 
         return stats
 
-    def get_rolling_correlation(self, window: int = 120, group: str = "all") -> Dict[str, List[Dict[str, float]]]:
-        returns = self._get_returns(group)
-        tickers = returns.columns
-        res = {}
+    def get_correlation_matrix(self, sensitivity: str = "standard", group: str = "all") -> Tuple[List[str], List[List[float]]]:
+        self._ensure_kalman()
+        matrix = self._kalman_matrices.get(sensitivity)
+        if matrix is None or matrix.empty:
+            return [], []
+        tickers = data_service.get_tickers_for_group(group)
+        tickers = [t for t in tickers if t in matrix.columns]
+        if len(tickers) < 2:
+            return tickers, [[1.0]]
+        sub = matrix.loc[tickers, tickers]
+        return sub.columns.tolist(), sub.values.tolist()
 
-        for i in range(len(tickers)):
-            for j in range(i+1, len(tickers)):
-                t1, t2 = tickers[i], tickers[j]
-                pair = f"{t1}-{t2}"
-                roll_corr = returns[t1].rolling(window).corr(returns[t2]).dropna()
-
-                sampled = roll_corr.iloc[::5]
-                points = [{"date": str(idx.date()), "value": val} for idx, val in sampled.items()]
-                res[pair] = points
-
+    def get_rolling_correlation(self, sensitivity: str = "standard", group: str = "all") -> Dict[str, List[Dict[str, float]]]:
+        self._ensure_kalman()
+        series = self._kalman_series.get(sensitivity, {})
+        group_tickers = set(data_service.get_tickers_for_group(group))
+        res: Dict[str, List[Dict[str, float]]] = {}
+        for (t1, t2), rho_series in series.items():
+            if t1 not in group_tickers or t2 not in group_tickers:
+                continue
+            pair_key = f"{t1}-{t2}"
+            sampled = rho_series.iloc[::5]
+            points = [{"date": str(idx.date()), "value": val} for idx, val in sampled.items()]
+            res[pair_key] = points
         return res
 
-    def get_rolling_volatility(self, window: int = 60, group: str = "all") -> Dict[str, List[Dict[str, float]]]:
-        returns = self._get_returns(group)
-        res = {}
-
-        for ticker in returns.columns:
-            roll_vol = returns[ticker].rolling(window).std() * np.sqrt(252)
-            roll_vol = roll_vol.dropna()
-
-            sampled = roll_vol.iloc[::5]
+    def get_rolling_volatility(self, group: str = "all") -> Dict[str, List[Dict[str, float]]]:
+        self._ensure_garch()
+        tickers = data_service.get_tickers_for_group(group)
+        tickers = [t for t in tickers if t in self._garch_vol]
+        res: Dict[str, List[Dict[str, float]]] = {}
+        for ticker in tickers:
+            vol = self._garch_vol[ticker].dropna() * np.sqrt(252)
+            sampled = vol.iloc[::5]
             points = [{"date": str(idx.date()), "value": val} for idx, val in sampled.items()]
             res[ticker] = points
-
         return res
 
-    def get_correlation_matrix(self, window: Optional[int] = None, group: str = "all") -> Tuple[List[str], List[List[float]]]:
-        returns = self._get_returns(group)
-        if window:
-            returns = returns.iloc[-window:]
-
-        # Filter out tickers with zero variance (all NaN returns in window)
-        valid_cols = [c for c in returns.columns if returns[c].notna().sum() > 1]
-        if len(valid_cols) != len(returns.columns):
-            dropped = set(returns.columns) - set(valid_cols)
-            print(f"Excluded {dropped} from correlation matrix (no variance in window {window})")
-            returns = returns[valid_cols]
-
-        if returns.empty or returns.shape[1] < 1:
-            return [], []
-
-        corr_matrix = returns.corr()
-        tickers = corr_matrix.columns.tolist()
-        matrix = corr_matrix.values.tolist()
-
-        return tickers, matrix
-
-    def get_anomalies(self, window: int = 120, group: str = "all") -> List[Dict]:
-        returns = self._get_returns(group)
-        tickers = returns.columns
+    def get_anomalies(self, sensitivity: str = "standard", group: str = "all") -> List[Dict]:
+        self._ensure_kalman()
+        series = self._kalman_series.get(sensitivity, {})
+        group_tickers = set(data_service.get_tickers_for_group(group))
         anomalies = []
-
-        for i in range(len(tickers)):
-            for j in range(i+1, len(tickers)):
-                t1, t2 = tickers[i], tickers[j]
-                pair = f"{t1}-{t2}"
-
-                roll_corr = returns[t1].rolling(window).corr(returns[t2]).dropna()
-                if roll_corr.empty: continue
-
-                current_corr = roll_corr.iloc[-1]
-                mean_corr = roll_corr.mean()
-                std_corr = roll_corr.std()
-
-                if std_corr > 0:
-                    z_score = (current_corr - mean_corr) / std_corr
-                else:
-                    z_score = 0
-
-                if abs(z_score) > 1.5:
-                    signal = "Alert"
-                elif abs(z_score) > 1.0:
-                    signal = "Warning"
-                else:
-                    signal = "Normal"
-
-                anomalies.append({
-                    "pair": pair,
-                    "current_corr": float(current_corr),
-                    "mean_corr": float(mean_corr),
-                    "std_corr": float(std_corr),
-                    "z_score": float(z_score),
-                    "signal": signal
-                })
-
+        for (t1, t2), rho_series in series.items():
+            if t1 not in group_tickers or t2 not in group_tickers:
+                continue
+            if len(rho_series) < 30:
+                continue
+            current_corr = float(rho_series.iloc[-1])
+            mean_corr = float(rho_series.mean())
+            std_corr = float(rho_series.std())
+            if std_corr > 0:
+                z_score = (current_corr - mean_corr) / std_corr
+            else:
+                z_score = 0.0
+            if abs(z_score) > 1.5:
+                signal = "Alert"
+            elif abs(z_score) > 1.0:
+                signal = "Warning"
+            else:
+                signal = "Normal"
+            anomalies.append({
+                "pair": f"{t1}-{t2}",
+                "current_corr": current_corr,
+                "mean_corr": mean_corr,
+                "std_corr": std_corr,
+                "z_score": z_score,
+                "signal": signal,
+            })
         anomalies.sort(key=lambda x: abs(x["z_score"]), reverse=True)
         return anomalies
 
     def generate_insights(self, anomalies: List[Dict], group: str = "all") -> Dict:
+        self._ensure_kalman()
         regime_notes = []
         allocation = []
 
+        # Use standard-sensitivity latest matrix for regime detection
+        matrix = self._kalman_matrices.get("standard")
+
+        def get_corr(t1: str, t2: str) -> float:
+            if matrix is None:
+                return 0.0
+            if t1 in matrix.columns and t2 in matrix.columns:
+                return float(matrix.loc[t1, t2])
+            return 0.0
+
         if group == "macro":
-            returns = self._get_returns("macro")
-            if 'VOO' in returns.columns and 'TLT' in returns.columns:
-                recent = returns['VOO'].iloc[-120:].corr(returns['TLT'].iloc[-120:])
-                if recent > 0.1:
-                    regime_notes.append("Stock-Bond correlation is positive. Traditional 60/40 diversification is compromised.")
-                    allocation.append("Consider adding commodities (GLD, PDBC) or cash to improve portfolio defense.")
-                else:
-                    regime_notes.append("Stock-Bond correlation is neutral to negative. 60/40 is functioning normally.")
+            stock_bond = get_corr("VOO", "TLT") if "TLT" in data_service.get_tickers_for_group("macro") else get_corr("VOO", "AGG")
+            if stock_bond > 0.1:
+                regime_notes.append("Stock-Bond correlation is positive. Traditional 60/40 diversification is compromised.")
+                allocation.append("Consider adding commodities (GLD, PDBC) or cash to improve portfolio defense.")
+            else:
+                regime_notes.append("Stock-Bond correlation is neutral to negative. 60/40 is functioning normally.")
 
-            if 'VOO' in returns.columns and 'GLD' in returns.columns:
-                recent = returns['VOO'].iloc[-120:].corr(returns['GLD'].iloc[-120:])
-                if recent < -0.3:
-                    regime_notes.append("Gold is negatively correlated with equities. Classic risk-off signal.")
-                    allocation.append("Gold continues to provide effective portfolio hedging.")
+            voo_gld = get_corr("VOO", "GLD")
+            if voo_gld < -0.3:
+                regime_notes.append("Gold is negatively correlated with equities. Classic risk-off signal.")
+                allocation.append("Gold continues to provide effective portfolio hedging.")
 
-            if 'PDBC' in returns.columns and 'GLD' in returns.columns:
-                recent = returns['PDBC'].iloc[-120:].corr(returns['GLD'].iloc[-120:])
-                if recent < 0.2:
-                    regime_notes.append("Commodities (PDBC) and Gold (GLD) are decoupling. Inflation expectations may be shifting.")
-                    allocation.append("Separate your commodity and gold allocations — they are serving different portfolio roles.")
+            pdbc_gld = get_corr("PDBC", "GLD")
+            if pdbc_gld < 0.2:
+                regime_notes.append("Commodities (PDBC) and Gold (GLD) are decoupling. Inflation expectations may be shifting.")
+                allocation.append("Separate your commodity and gold allocations — they are serving different portfolio roles.")
 
         elif group == "equities":
-            returns = self._get_returns("equities")
-            if all(t in returns.columns for t in ['VOOG', 'VOOV']):
-                recent = returns['VOOG'].iloc[-120:].corr(returns['VOOV'].iloc[-120:])
-                if recent < 0.85:
-                    regime_notes.append("Growth-Value correlation is declining. Significant style divergence in progress.")
-                elif recent > 0.95:
-                    regime_notes.append("Growth and Value are moving in lockstep. Low style dispersion regime.")
+            growth_value = get_corr("VOOG", "VOOV")
+            if growth_value < 0.85:
+                regime_notes.append("Growth-Value correlation is declining. Significant style divergence in progress.")
+            elif growth_value > 0.95:
+                regime_notes.append("Growth and Value are moving in lockstep. Low style dispersion regime.")
 
-            if all(t in returns.columns for t in ['VOO', 'VXUS']):
-                recent = returns['VOO'].iloc[-120:].corr(returns['VXUS'].iloc[-120:])
-                if recent < 0.7:
-                    regime_notes.append("US and International equities are diverging. Potential regime shift in global leadership.")
+            us_intl = get_corr("VOO", "VXUS")
+            if us_intl < 0.7:
+                regime_notes.append("US and International equities are diverging. Potential regime shift in global leadership.")
 
             for a in anomalies:
                 if a['pair'] in ['VOO-COWZ', 'COWZ-VOO'] and a['z_score'] < -1.0:
                     allocation.append("Cash Cows (COWZ) are decoupling from the market. Good environment for factor diversification.")
 
         elif group == "fixed_income":
-            returns = self._get_returns("fixed_income")
-            if all(t in returns.columns for t in ['IEF', 'TLT']):
-                recent = returns['IEF'].iloc[-120:].corr(returns['TLT'].iloc[-120:])
-                if recent < 0.7:
-                    regime_notes.append("Short-end and long-end Treasuries are decoupling. Yield curve dynamics are shifting.")
+            short_long = get_corr("IEF", "TLT")
+            if short_long < 0.7:
+                regime_notes.append("Short-end and long-end Treasuries are decoupling. Yield curve dynamics are shifting.")
 
-            if all(t in returns.columns for t in ['LQD', 'HYG']):
-                recent = returns['LQD'].iloc[-120:].corr(returns['HYG'].iloc[-120:])
-                if recent < 0.7:
-                    regime_notes.append("Investment grade and high yield credit are diverging. Credit risk repricing in progress.")
+            lqd_hyg = get_corr("LQD", "HYG")
+            if lqd_hyg < 0.7:
+                regime_notes.append("Investment grade and high yield credit are diverging. Credit risk repricing in progress.")
 
-            if all(t in returns.columns for t in ['TLT', 'TIP']):
-                recent = returns['TLT'].iloc[-120:].corr(returns['TIP'].iloc[-120:])
-                if recent < 0.5:
-                    regime_notes.append("Nominal bonds and TIPS are diverging. Inflation expectations may be shifting rapidly.")
+            tlt_tip = get_corr("TLT", "TIP")
+            if tlt_tip < 0.5:
+                regime_notes.append("Nominal bonds and TIPS are diverging. Inflation expectations may be shifting rapidly.")
 
-            if all(t in returns.columns for t in ['TLT', 'AGG']):
-                recent = returns['TLT'].iloc[-120:].corr(returns['AGG'].iloc[-120:])
-                if recent < 0.7:
-                    regime_notes.append("Long-term Treasuries and Aggregate bonds are diverging. Duration positioning matters more than usual.")
+            tlt_agg = get_corr("TLT", "AGG")
+            if tlt_agg < 0.7:
+                regime_notes.append("Long-term Treasuries and Aggregate bonds are diverging. Duration positioning matters more than usual.")
 
         elif group == "commodities_alts":
-            returns = self._get_returns("commodities_alts")
-            if all(t in returns.columns for t in ['PDBC', 'USO']):
-                recent = returns['PDBC'].iloc[-120:].corr(returns['USO'].iloc[-120:])
-                if recent > 0.8:
-                    regime_notes.append("Broad commodities are highly correlated with oil. Energy is driving the commodity complex.")
+            pdbc_uso = get_corr("PDBC", "USO")
+            if pdbc_uso > 0.8:
+                regime_notes.append("Broad commodities are highly correlated with oil. Energy is driving the commodity complex.")
 
-            if all(t in returns.columns for t in ['GLD', 'PDBC']):
-                recent = returns['GLD'].iloc[-120:].corr(returns['PDBC'].iloc[-120:])
-                if recent < 0.1:
-                    regime_notes.append("Gold and broad commodities are uncorrelated. Gold is behaving as monetary hedge, not cyclical asset.")
+            gld_pdbc = get_corr("GLD", "PDBC")
+            if gld_pdbc < 0.1:
+                regime_notes.append("Gold and broad commodities are uncorrelated. Gold is behaving as monetary hedge, not cyclical asset.")
 
             for a in anomalies:
                 if a['pair'] in ['BTC-USD-GLD', 'GLD-BTC-USD'] and abs(a['z_score']) > 1.0:
@@ -259,7 +322,8 @@ class AnalysisService:
 
         return {
             "regime_notes": regime_notes,
-            "allocation_suggestions": allocation
+            "allocation_suggestions": allocation,
         }
+
 
 analysis_service = AnalysisService()

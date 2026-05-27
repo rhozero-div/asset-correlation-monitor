@@ -5,4 +5,5 @@ yfinance==1.3.0
 pandas==2.2.0
 numpy==1.26.3
 scipy==1.12.0
+arch==6.3.0
 python-dotenv==1.0.0

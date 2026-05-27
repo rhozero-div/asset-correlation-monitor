@@ -21,7 +21,7 @@ export interface TimeSeriesPoint {
 }
 
 export interface RollingResponse {
-  window: number;
+  sensitivity: string;
   data: Record<string, TimeSeriesPoint[]>;
 }
 

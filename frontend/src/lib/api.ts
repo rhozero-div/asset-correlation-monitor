@@ -1,11 +1,12 @@
-import { 
-  RefreshResponse, SummaryStat, RollingResponse, 
-  MatrixResponse, AnomalySignal, InsightResponse 
+import {
+  RefreshResponse, SummaryStat, RollingResponse,
+  MatrixResponse, AnomalySignal, InsightResponse
 } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8012/api/v1/analysis";
 
 export type AssetGroup = "all" | "macro" | "equities" | "fixed_income" | "commodities_alts";
+export type Sensitivity = "fast" | "standard" | "smooth";
 
 export async function refreshData(): Promise<RefreshResponse> {
   const res = await fetch(`${API_BASE}/refresh`, { method: "POST" });
@@ -19,38 +20,38 @@ export async function fetchSummary(group: AssetGroup = "macro"): Promise<Summary
   return res.json();
 }
 
-export async function fetchRollingCorrelation(window: number = 120, group: AssetGroup = "macro"): Promise<RollingResponse> {
-  const res = await fetch(`${API_BASE}/rolling/correlation?window=${window}&group=${group}`);
+export async function fetchRollingCorrelation(sensitivity: Sensitivity = "standard", group: AssetGroup = "macro"): Promise<RollingResponse> {
+  const res = await fetch(`${API_BASE}/rolling/correlation?sensitivity=${sensitivity}&group=${group}`);
   if (!res.ok) throw new Error("Failed to fetch rolling correlation");
   return res.json();
 }
 
-export async function fetchRollingVolatility(window: number = 60, group: AssetGroup = "macro"): Promise<RollingResponse> {
-  const res = await fetch(`${API_BASE}/rolling/volatility?window=${window}&group=${group}`);
+export async function fetchRollingVolatility(sensitivity: Sensitivity = "standard", group: AssetGroup = "macro"): Promise<RollingResponse> {
+  const res = await fetch(`${API_BASE}/rolling/volatility?sensitivity=${sensitivity}&group=${group}`);
   if (!res.ok) throw new Error("Failed to fetch rolling volatility");
   return res.json();
 }
 
-export async function fetchRecentMatrix(window: number = 120, group: AssetGroup = "macro"): Promise<MatrixResponse> {
-  const res = await fetch(`${API_BASE}/correlation/matrix/recent?window=${window}&group=${group}`);
+export async function fetchRecentMatrix(sensitivity: Sensitivity = "standard", group: AssetGroup = "macro"): Promise<MatrixResponse> {
+  const res = await fetch(`${API_BASE}/correlation/matrix/recent?sensitivity=${sensitivity}&group=${group}`);
   if (!res.ok) throw new Error("Failed to fetch recent matrix");
   return res.json();
 }
 
-export async function fetchLongTermMatrix(group: AssetGroup = "macro"): Promise<MatrixResponse> {
-  const res = await fetch(`${API_BASE}/correlation/matrix/long-term?group=${group}`);
+export async function fetchLongTermMatrix(sensitivity: Sensitivity = "standard", group: AssetGroup = "macro"): Promise<MatrixResponse> {
+  const res = await fetch(`${API_BASE}/correlation/matrix/long-term?sensitivity=${sensitivity}&group=${group}`);
   if (!res.ok) throw new Error("Failed to fetch long term matrix");
   return res.json();
 }
 
-export async function fetchAnomalies(window: number = 120, group: AssetGroup = "macro"): Promise<AnomalySignal[]> {
-  const res = await fetch(`${API_BASE}/anomalies?window=${window}&group=${group}`);
+export async function fetchAnomalies(sensitivity: Sensitivity = "standard", group: AssetGroup = "macro"): Promise<AnomalySignal[]> {
+  const res = await fetch(`${API_BASE}/anomalies?sensitivity=${sensitivity}&group=${group}`);
   if (!res.ok) throw new Error("Failed to fetch anomalies");
   return res.json();
 }
 
-export async function fetchInsights(window: number = 120, group: AssetGroup = "macro"): Promise<InsightResponse> {
-  const res = await fetch(`${API_BASE}/insights?window=${window}&group=${group}`);
+export async function fetchInsights(sensitivity: Sensitivity = "standard", group: AssetGroup = "macro"): Promise<InsightResponse> {
+  const res = await fetch(`${API_BASE}/insights?sensitivity=${sensitivity}&group=${group}`);
   if (!res.ok) throw new Error("Failed to fetch insights");
   return res.json();
 }

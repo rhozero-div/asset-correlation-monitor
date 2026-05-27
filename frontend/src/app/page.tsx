@@ -8,16 +8,16 @@ import AnomalySignals from "@/components/AnomalySignals";
 import InsightsPanel from "@/components/InsightsPanel";
 import { Activity, GitBranch, RefreshCcw, TrendingUp, Globe, BarChart3, Banknote, Package } from "lucide-react";
 import clsx from "clsx";
-import { 
-  fetchSummary, fetchRecentMatrix, fetchLongTermMatrix, 
-  fetchRollingCorrelation, fetchRollingVolatility, 
+import {
+  fetchSummary, fetchRecentMatrix, fetchLongTermMatrix,
+  fetchRollingCorrelation, fetchRollingVolatility,
   fetchAnomalies, fetchInsights, refreshData,
-  AssetGroup
+  AssetGroup, Sensitivity
 } from "@/lib/api";
 
-import { 
-  SummaryStat, MatrixResponse, RollingResponse, 
-  AnomalySignal, InsightResponse 
+import {
+  SummaryStat, MatrixResponse, RollingResponse,
+  AnomalySignal, InsightResponse
 } from "@/lib/types";
 
 type Tab = "overview" | "rolling" | "signals";
@@ -40,8 +40,8 @@ export default function Dashboard() {
   const [activeGroup, setActiveGroup] = useState<AssetGroup>("macro");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [windowSize, setWindowSize] = useState(120);
-  
+  const [sensitivity, setSensitivity] = useState<Sensitivity>("standard");
+
   const [data, setData] = useState<{
     summary: SummaryStat[];
     recentMatrix: MatrixResponse | null;
@@ -61,28 +61,28 @@ export default function Dashboard() {
   });
 
   // Track the latest params to ignore stale Promise resolves
-  const loadedRef = useRef({ group: activeGroup, window: windowSize });
+  const loadedRef = useRef({ group: activeGroup, sensitivity });
 
   const loadData = useCallback(async () => {
     const group = activeGroup;
-    const win = windowSize;
-    loadedRef.current = { group, window: win };
+    const sens = sensitivity;
+    loadedRef.current = { group, sensitivity: sens };
     setLoading(true);
     try {
       const [sum, rec, lng, rCorr, rVol, anom, ins] = await Promise.all([
         fetchSummary(group),
-        fetchRecentMatrix(win, group),
-        fetchLongTermMatrix(group),
-        fetchRollingCorrelation(win, group),
-        fetchRollingVolatility(60, group),
-        fetchAnomalies(win, group),
-        fetchInsights(win, group)
+        fetchRecentMatrix(sens, group),
+        fetchLongTermMatrix(sens, group),
+        fetchRollingCorrelation(sens, group),
+        fetchRollingVolatility(sens, group),
+        fetchAnomalies(sens, group),
+        fetchInsights(sens, group)
       ]);
-      
-      // Ignore stale responses from previous group/window
+
+      // Ignore stale responses from previous group/sensitivity
       const current = loadedRef.current;
-      if (current.group !== group || current.window !== win) return;
-      
+      if (current.group !== group || current.sensitivity !== sens) return;
+
       setData({
         summary: sum,
         recentMatrix: rec,
@@ -96,11 +96,11 @@ export default function Dashboard() {
       console.error("Failed to load data:", error);
     } finally {
       const current = loadedRef.current;
-      if (current.group === group && current.window === win) {
+      if (current.group === group && current.sensitivity === sens) {
         setLoading(false);
       }
     }
-  }, [activeGroup, windowSize]);
+  }, [activeGroup, sensitivity]);
 
   useEffect(() => {
     loadData();
@@ -136,21 +136,21 @@ export default function Dashboard() {
           </h1>
           <p className="text-gray-400">Macro asset allocation analysis & anomaly detection</p>
         </div>
-        
+
         <div className="flex items-center gap-4 bg-surface p-2 rounded-xl border border-border">
           <div className="flex items-center gap-2 px-2">
-            <span className="text-sm text-gray-400">Window:</span>
-            <select 
+            <span className="text-sm text-gray-400">Sensitivity:</span>
+            <select
               className="bg-transparent text-white text-sm outline-none cursor-pointer font-mono"
-              value={windowSize}
-              onChange={(e) => setWindowSize(Number(e.target.value))}
+              value={sensitivity}
+              onChange={(e) => setSensitivity(e.target.value as Sensitivity)}
             >
-              <option value={60}>60 Days</option>
-              <option value={120}>120 Days</option>
-              <option value={252}>252 Days</option>
+              <option value="fast">Fast (Q=0.01)</option>
+              <option value="standard">Standard (Q=0.005)</option>
+              <option value="smooth">Smooth (Q=0.0001)</option>
             </select>
           </div>
-          <button 
+          <button
             onClick={handleRefresh}
             disabled={refreshing}
             className="btn btn-secondary flex items-center gap-2"
@@ -217,7 +217,7 @@ export default function Dashboard() {
                 <CorrelationHeatmap recent={data.recentMatrix} longTerm={data.longTermMatrix} />
               </div>
             )}
-            
+
             {activeTab === "rolling" && (
               <div className="space-y-6">
                 <RollingTimeSeries
@@ -228,7 +228,7 @@ export default function Dashboard() {
                 />
               </div>
             )}
-            
+
             {activeTab === "signals" && (
               <div className="space-y-6">
                 <InsightsPanel insights={data.insights} />

@@ -21,7 +21,7 @@ class TimeSeriesPoint(BaseModel):
     value: float
 
 class RollingResponse(BaseModel):
-    window: int
+    sensitivity: str
     data: Dict[str, List[TimeSeriesPoint]]
 
 class MatrixResponse(BaseModel):
