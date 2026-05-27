@@ -71,8 +71,8 @@ export default function Dashboard() {
     try {
       const [sum, rec, lng, rCorr, rVol, anom, ins] = await Promise.all([
         fetchSummary(group),
-        fetchRecentMatrix(sens, group),
-        fetchLongTermMatrix(sens, group),
+        fetchRecentMatrix("fast", group),
+        fetchLongTermMatrix("smooth", group),
         fetchRollingCorrelation(sens, group),
         fetchRollingVolatility(sens, group),
         fetchAnomalies(sens, group),
