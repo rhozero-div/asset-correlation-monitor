@@ -186,7 +186,7 @@ class AnalysisService:
             if t1 not in group_tickers or t2 not in group_tickers:
                 continue
             pair_key = f"{t1}-{t2}"
-            sampled = rho_series.iloc[::5]
+            sampled = rho_series.iloc[::-5][::-1]
             points = [{"date": str(idx.date()), "value": val} for idx, val in sampled.items()]
             res[pair_key] = points
         return res
@@ -198,7 +198,7 @@ class AnalysisService:
         res: Dict[str, List[Dict[str, float]]] = {}
         for ticker in tickers:
             vol = self._garch_vol[ticker].dropna() * np.sqrt(252)
-            sampled = vol.iloc[::5]
+            sampled = vol.iloc[::-5][::-1]
             points = [{"date": str(idx.date()), "value": val} for idx, val in sampled.items()]
             res[ticker] = points
         return res
