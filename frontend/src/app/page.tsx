@@ -145,9 +145,9 @@ export default function Dashboard() {
               value={sensitivity}
               onChange={(e) => setSensitivity(e.target.value as Sensitivity)}
             >
-              <option value="fast">Fast (Q=0.01)</option>
-              <option value="standard">Standard (Q=0.005)</option>
-              <option value="smooth">Smooth (Q=0.0001)</option>
+              <option value="fast">Fast (Q=0.0001)</option>
+              <option value="standard">Standard (Q=0.00005)</option>
+              <option value="smooth">Smooth (Q=0.00001)</option>
             </select>
           </div>
           <button
