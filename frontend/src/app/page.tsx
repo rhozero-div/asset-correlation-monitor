@@ -6,21 +6,23 @@ import CorrelationHeatmap from "@/components/CorrelationHeatmap";
 import RollingTimeSeries from "@/components/RollingTimeSeries";
 import AnomalySignals from "@/components/AnomalySignals";
 import InsightsPanel from "@/components/InsightsPanel";
-import { Activity, GitBranch, RefreshCcw, TrendingUp, Globe, BarChart3, Banknote, Package } from "lucide-react";
+import ForwardTable, { AssetRow } from "@/components/ForwardTable";
+import FrontierPlot from "@/components/FrontierPlot";
+import { Activity, GitBranch, RefreshCcw, TrendingUp, Globe, BarChart3, Banknote, Package, PieChart } from "lucide-react";
 import clsx from "clsx";
 import {
   fetchSummary, fetchRecentMatrix, fetchLongTermMatrix,
   fetchRollingCorrelation, fetchRollingVolatility,
-  fetchAnomalies, fetchInsights, refreshData,
+  fetchAnomalies, fetchInsights, refreshData, computeFrontier,
   AssetGroup, Sensitivity
 } from "@/lib/api";
 
 import {
   SummaryStat, MatrixResponse, RollingResponse,
-  AnomalySignal, InsightResponse
+  AnomalySignal, InsightResponse, FrontierResponse
 } from "@/lib/types";
 
-type Tab = "overview" | "rolling" | "signals";
+type Tab = "overview" | "rolling" | "signals" | "frontier";
 
 interface GroupConfig {
   id: AssetGroup;
@@ -41,6 +43,12 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [sensitivity, setSensitivity] = useState<Sensitivity>("standard");
+
+  const [rfRate, setRfRate] = useState(4.5);
+  const [allowShort, setAllowShort] = useState(false);
+  const [forwardRows, setForwardRows] = useState<AssetRow[]>([]);
+  const [frontierData, setFrontierData] = useState<FrontierResponse | null>(null);
+  const [computingFrontier, setComputingFrontier] = useState(false);
 
   const [data, setData] = useState<{
     summary: SummaryStat[];
@@ -105,6 +113,56 @@ export default function Dashboard() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Sync forward rows when summary changes
+  useEffect(() => {
+    if (data.summary.length > 0) {
+      setForwardRows(data.summary.map(s => ({
+        ticker: s.ticker,
+        name: s.ticker, // Could be enriched with real names if available
+        include: true,
+        mu: s.cagr_all !== null ? parseFloat((s.cagr_all * 100).toFixed(2)) : 5.0,
+        sigma: s.vol_all !== null ? parseFloat((s.vol_all * 100).toFixed(2)) : 15.0,
+      })));
+      setFrontierData(null);
+    }
+  }, [data.summary, activeGroup]);
+
+  const handleAutoFill = () => {
+    if (data.summary.length > 0) {
+      setForwardRows(rows => rows.map(r => {
+        const s = data.summary.find(x => x.ticker === r.ticker);
+        return {
+          ...r,
+          mu: s?.cagr_all !== null && s?.cagr_all !== undefined ? parseFloat((s.cagr_all * 100).toFixed(2)) : r.mu,
+          sigma: s?.vol_all !== null && s?.vol_all !== undefined ? parseFloat((s.vol_all * 100).toFixed(2)) : r.sigma,
+        };
+      }));
+    }
+  };
+
+  const handleComputeFrontier = async () => {
+    const included = forwardRows.filter(r => r.include);
+    if (included.length < 2) return;
+    
+    setComputingFrontier(true);
+    try {
+      const res = await computeFrontier({
+        tickers: included.map(r => r.ticker),
+        mu: included.map(r => r.mu / 100.0), // convert back to decimal
+        sigma: included.map(r => r.sigma / 100.0), // convert back to decimal
+        rf: rfRate / 100.0,
+        allowShort,
+        nPoints: 100
+      });
+      setFrontierData(res);
+      
+    } catch (error) {
+      console.error("Failed to compute frontier:", error);
+    } finally {
+      setComputingFrontier(false);
+    }
+  };
 
   const handleGroupChange = (group: AssetGroup) => {
     if (group !== activeGroup) {
@@ -186,6 +244,7 @@ export default function Dashboard() {
           { id: "overview", label: "Overview", icon: Activity },
           { id: "rolling", label: "Time Series", icon: TrendingUp },
           { id: "signals", label: "Insights & Signals", icon: GitBranch },
+          { id: "frontier", label: "Efficient Frontier", icon: PieChart },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -233,6 +292,33 @@ export default function Dashboard() {
               <div className="space-y-6">
                 <InsightsPanel insights={data.insights} />
                 <AnomalySignals signals={data.anomalies} />
+              </div>
+            )}
+
+            {activeTab === "frontier" && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="lg:col-span-1 space-y-6">
+                    <ForwardTable 
+                      rows={forwardRows} 
+                      rfRate={rfRate}
+                      allowShort={allowShort}
+                      onRowsChange={setForwardRows}
+                      onRfChange={setRfRate}
+                      onAllowShortChange={setAllowShort}
+                      onAutoFill={handleAutoFill}
+                      onCompute={handleComputeFrontier}
+                      computing={computingFrontier}
+                    />
+                  </div>
+                  
+                  <div className="lg:col-span-2">
+                    <FrontierPlot 
+                      data={frontierData} 
+                      customPortfolio={null}
+                    />
+                  </div>
+                </div>
               </div>
             )}
           </div>

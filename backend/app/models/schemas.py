@@ -39,3 +39,29 @@ class AnomalySignal(BaseModel):
 class InsightResponse(BaseModel):
     regime_notes: List[str]
     allocation_suggestions: List[str]
+
+class FrontierRequest(BaseModel):
+    tickers: List[str]
+    mu: List[float]
+    sigma: List[float]
+    rf: float = 0.045
+    allowShort: bool = False
+    nPoints: int = 100
+
+class PortfolioPoint(BaseModel):
+    weights: List[float]
+    ret: float
+    vol: float
+    sharpe: float
+
+class AssetPoints(BaseModel):
+    tickers: List[str]
+    vol: List[float]
+    ret: List[float]
+
+class FrontierResponse(BaseModel):
+    efPoints: List[PortfolioPoint]
+    maxSharpe: Optional[PortfolioPoint]
+    minVol: Optional[PortfolioPoint]
+    assetPoints: AssetPoints
+    warnings: List[str]

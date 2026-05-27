@@ -43,3 +43,33 @@ export interface InsightResponse {
   regime_notes: string[];
   allocation_suggestions: string[];
 }
+
+export interface FrontierRequest {
+  tickers: string[];
+  mu: number[];
+  sigma: number[];
+  rf?: number;
+  allowShort?: boolean;
+  nPoints?: number;
+}
+
+export interface PortfolioPoint {
+  weights: number[];
+  ret: number;
+  vol: number;
+  sharpe: number;
+}
+
+export interface AssetPoints {
+  tickers: string[];
+  vol: number[];
+  ret: number[];
+}
+
+export interface FrontierResponse {
+  efPoints: PortfolioPoint[];
+  maxSharpe: PortfolioPoint | null;
+  minVol: PortfolioPoint | null;
+  assetPoints: AssetPoints;
+  warnings: string[];
+}

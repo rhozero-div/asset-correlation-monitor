@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import os
 
-from app.routers import analysis
+from app.routers import analysis, frontier
 from app.services.data_service import data_service
 
 @asynccontextmanager
@@ -31,6 +31,7 @@ app.add_middleware(
 )
 
 app.include_router(analysis.router)
+app.include_router(frontier.router)
 
 @app.get("/")
 async def root():

@@ -1,6 +1,7 @@
-import {
-  RefreshResponse, SummaryStat, RollingResponse,
-  MatrixResponse, AnomalySignal, InsightResponse
+import { 
+  RefreshResponse, SummaryStat, RollingResponse, 
+  MatrixResponse, AnomalySignal, InsightResponse,
+  FrontierRequest, FrontierResponse
 } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8012/api/v1/analysis";
@@ -53,5 +54,15 @@ export async function fetchAnomalies(sensitivity: Sensitivity = "standard", grou
 export async function fetchInsights(sensitivity: Sensitivity = "standard", group: AssetGroup = "macro"): Promise<InsightResponse> {
   const res = await fetch(`${API_BASE}/insights?sensitivity=${sensitivity}&group=${group}`);
   if (!res.ok) throw new Error("Failed to fetch insights");
+  return res.json();
+}
+
+export async function computeFrontier(req: FrontierRequest): Promise<FrontierResponse> {
+  const res = await fetch(`${API_BASE.replace("/analysis", "/frontier")}/compute`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req)
+  });
+  if (!res.ok) throw new Error("Failed to compute efficient frontier");
   return res.json();
 }
