@@ -8,7 +8,7 @@ import AnomalySignals from "@/components/AnomalySignals";
 import InsightsPanel from "@/components/InsightsPanel";
 import ForwardTable, { AssetRow } from "@/components/ForwardTable";
 import FrontierPlot from "@/components/FrontierPlot";
-import { Activity, GitBranch, RefreshCcw, TrendingUp, Globe, BarChart3, Banknote, Package, PieChart } from "lucide-react";
+import { Activity, GitBranch, RefreshCcw, TrendingUp, Globe, BarChart3, Banknote, Package } from "lucide-react";
 import clsx from "clsx";
 import {
   fetchSummary, fetchRecentMatrix, fetchLongTermMatrix,
@@ -22,7 +22,8 @@ import {
   AnomalySignal, InsightResponse, FrontierResponse
 } from "@/lib/types";
 
-type Tab = "overview" | "rolling" | "signals" | "frontier";
+type Tab = "overview" | "rolling" | "signals";
+type ViewMode = "monitor" | "frontier";
 
 interface GroupConfig {
   id: AssetGroup;
@@ -38,6 +39,7 @@ const GROUPS: GroupConfig[] = [
 ];
 
 export default function Dashboard() {
+  const [viewMode, setViewMode] = useState<ViewMode>("monitor");
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [activeGroup, setActiveGroup] = useState<AssetGroup>("macro");
   const [loading, setLoading] = useState(true);
@@ -49,6 +51,7 @@ export default function Dashboard() {
   const [forwardRows, setForwardRows] = useState<AssetRow[]>([]);
   const [frontierData, setFrontierData] = useState<FrontierResponse | null>(null);
   const [computingFrontier, setComputingFrontier] = useState(false);
+  const [usingSavedDefaults, setUsingSavedDefaults] = useState(false);
 
   const [data, setData] = useState<{
     summary: SummaryStat[];
@@ -116,17 +119,39 @@ export default function Dashboard() {
 
   // Sync forward rows when summary changes
   useEffect(() => {
-    if (data.summary.length > 0) {
+    if (data.summary.length > 0 && viewMode === "frontier") {
+      const savedDefaults = localStorage.getItem("frontierDefaults");
+      if (savedDefaults) {
+        try {
+          const parsed = JSON.parse(savedDefaults);
+          // Only use if the tickers match
+          if (Array.isArray(parsed) && parsed.length === data.summary.length) {
+            setForwardRows(parsed);
+            setUsingSavedDefaults(true);
+            setFrontierData(null);
+            return;
+          }
+        } catch (e) {
+          console.error("Failed to parse saved defaults", e);
+        }
+      }
+
       setForwardRows(data.summary.map(s => ({
         ticker: s.ticker,
-        name: s.ticker, // Could be enriched with real names if available
+        name: s.ticker,
         include: true,
         mu: s.cagr_all !== null ? parseFloat((s.cagr_all * 100).toFixed(2)) : 5.0,
         sigma: s.vol_all !== null ? parseFloat((s.vol_all * 100).toFixed(2)) : 15.0,
       })));
+      setUsingSavedDefaults(false);
       setFrontierData(null);
     }
-  }, [data.summary, activeGroup]);
+  }, [data.summary, viewMode]);
+
+  const handleSaveDefaults = () => {
+    localStorage.setItem("frontierDefaults", JSON.stringify(forwardRows));
+    setUsingSavedDefaults(true);
+  };
 
   const handleAutoFill = () => {
     if (data.summary.length > 0) {
@@ -138,6 +163,16 @@ export default function Dashboard() {
           sigma: s?.vol_all !== null && s?.vol_all !== undefined ? parseFloat((s.vol_all * 100).toFixed(2)) : r.sigma,
         };
       }));
+      setUsingSavedDefaults(false);
+    }
+  };
+
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode);
+    if (mode === "frontier") {
+      setActiveGroup("all");
+    } else {
+      if (activeGroup === "all") setActiveGroup("macro");
     }
   };
 
@@ -219,48 +254,72 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Group Navigation (Tier 1) */}
-      <div className="flex space-x-1 border-b border-border/50">
-        {GROUPS.map((g) => (
+      {/* Primary Navigation */}
+      <div className="flex space-x-1 border-b border-border/50 mt-4">
+        {[
+          { id: "monitor", label: "📊 Market Monitor" },
+          { id: "frontier", label: "🥧 Efficient Frontier" },
+        ].map((nav) => (
           <button
-            key={g.id}
-            onClick={() => handleGroupChange(g.id as AssetGroup)}
+            key={nav.id}
+            onClick={() => handleViewModeChange(nav.id as ViewMode)}
             className={clsx(
-              "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors",
-              activeGroup === g.id
+              "flex items-center gap-2 px-6 py-3 text-sm font-semibold border-b-2 transition-colors",
+              viewMode === nav.id
                 ? "border-accent text-accent"
                 : "border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600"
             )}
           >
-            {g.icon}
-            {g.label}
+            {nav.label}
           </button>
         ))}
       </div>
 
-      {/* View Tabs (Tier 2) */}
-      <div className="flex space-x-1 border-b border-border/50">
-        {[
-          { id: "overview", label: "Overview", icon: Activity },
-          { id: "rolling", label: "Time Series", icon: TrendingUp },
-          { id: "signals", label: "Insights & Signals", icon: GitBranch },
-          { id: "frontier", label: "Efficient Frontier", icon: PieChart },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as Tab)}
-            className={clsx(
-              "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors",
-              activeTab === tab.id
-                ? "border-accent text-accent"
-                : "border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600"
-            )}
-          >
-            <tab.icon size={16} />
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {viewMode === "monitor" && (
+        <>
+          {/* Group Navigation (Tier 1) */}
+          <div className="flex space-x-1 border-b border-border/50">
+            {GROUPS.map((g) => (
+              <button
+                key={g.id}
+                onClick={() => handleGroupChange(g.id as AssetGroup)}
+                className={clsx(
+                  "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors",
+                  activeGroup === g.id
+                    ? "border-accent text-accent"
+                    : "border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600"
+                )}
+              >
+                {g.icon}
+                {g.label}
+              </button>
+            ))}
+          </div>
+
+          {/* View Tabs (Tier 2) */}
+          <div className="flex space-x-1 border-b border-border/50">
+            {[
+              { id: "overview", label: "Overview", icon: Activity },
+              { id: "rolling", label: "Time Series", icon: TrendingUp },
+              { id: "signals", label: "Insights & Signals", icon: GitBranch },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as Tab)}
+                className={clsx(
+                  "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors",
+                  activeTab === tab.id
+                    ? "border-accent text-accent"
+                    : "border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600"
+                )}
+              >
+                <tab.icon size={16} />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* Content */}
       <div className="min-h-[500px]">
@@ -270,14 +329,14 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="animate-in fade-in duration-300">
-            {activeTab === "overview" && (
+            {viewMode === "monitor" && activeTab === "overview" && (
               <div className="space-y-6">
                 <SummaryTable data={data.summary} />
                 <CorrelationHeatmap recent={data.recentMatrix} longTerm={data.longTermMatrix} />
               </div>
             )}
 
-            {activeTab === "rolling" && (
+            {viewMode === "monitor" && activeTab === "rolling" && (
               <div className="space-y-6">
                 <RollingTimeSeries
                   key={activeGroup}
@@ -288,15 +347,15 @@ export default function Dashboard() {
               </div>
             )}
 
-            {activeTab === "signals" && (
+            {viewMode === "monitor" && activeTab === "signals" && (
               <div className="space-y-6">
                 <InsightsPanel insights={data.insights} />
                 <AnomalySignals signals={data.anomalies} />
               </div>
             )}
 
-            {activeTab === "frontier" && (
-              <div className="space-y-6">
+            {viewMode === "frontier" && (
+              <div className="space-y-6 mt-4">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   <div className="lg:col-span-1 space-y-6">
                     <ForwardTable 
@@ -307,12 +366,14 @@ export default function Dashboard() {
                       onRfChange={setRfRate}
                       onAllowShortChange={setAllowShort}
                       onAutoFill={handleAutoFill}
+                      onSaveDefaults={handleSaveDefaults}
                       onCompute={handleComputeFrontier}
                       computing={computingFrontier}
+                      usingSavedDefaults={usingSavedDefaults}
                     />
                   </div>
                   
-                  <div className="lg:col-span-2">
+                  <div className="lg:col-span-2 space-y-6">
                     <FrontierPlot 
                       data={frontierData} 
                       customPortfolio={null}

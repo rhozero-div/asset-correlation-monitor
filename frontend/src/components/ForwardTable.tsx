@@ -18,12 +18,14 @@ interface Props {
   onRfChange: (rf: number) => void;
   onAllowShortChange: (allow: boolean) => void;
   onAutoFill: () => void;
+  onSaveDefaults: () => void;
   onCompute: () => void;
   computing: boolean;
+  usingSavedDefaults: boolean;
 }
 
 export default function ForwardTable({
-  rows, rfRate, allowShort, onRowsChange, onRfChange, onAllowShortChange, onAutoFill, onCompute, computing
+  rows, rfRate, allowShort, onRowsChange, onRfChange, onAllowShortChange, onAutoFill, onSaveDefaults, onCompute, computing, usingSavedDefaults
 }: Props) {
   const updateRow = (idx: number, patch: Partial<AssetRow>) => {
     const next = [...rows];
@@ -38,14 +40,29 @@ export default function ForwardTable({
   return (
     <div className="card space-y-4 overflow-hidden">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <h3 className="text-xl font-semibold text-accent">Forward Estimates</h3>
+        <div className="flex items-center gap-3">
+          <h3 className="text-xl font-semibold text-accent">Forward Estimates</h3>
+          {usingSavedDefaults ? (
+            <span className="px-2 py-0.5 rounded text-xs bg-accent/20 text-accent border border-accent/30">Using Saved Defaults</span>
+          ) : (
+            <span className="px-2 py-0.5 rounded text-xs bg-gray-800 text-gray-400 border border-gray-700">Using Historical Averages</span>
+          )}
+        </div>
         <div className="flex flex-wrap items-center gap-4">
-          <button 
-            onClick={onAutoFill} 
-            className="text-sm font-medium text-accent hover:text-accent/80 transition-colors bg-accent/10 px-3 py-1.5 rounded"
-          >
-            Auto-fill from History
-          </button>
+          <div className="flex gap-2">
+            <button 
+              onClick={onAutoFill} 
+              className="text-xs font-medium text-gray-300 hover:text-white transition-colors bg-surface/80 border border-border/50 px-2 py-1.5 rounded"
+            >
+              Auto-fill History
+            </button>
+            <button 
+              onClick={onSaveDefaults} 
+              className="text-xs font-medium text-accent hover:text-accent/80 transition-colors bg-accent/10 border border-accent/20 px-2 py-1.5 rounded"
+            >
+              💾 Save as My Defaults
+            </button>
+          </div>
           
           <label className="flex items-center gap-2 text-sm text-gray-300">
             Allow Shorting:
