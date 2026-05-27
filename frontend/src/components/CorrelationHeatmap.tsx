@@ -27,20 +27,25 @@ export default function CorrelationHeatmap({
   if (!recent || !longTerm) return <div className="card h-[400px] animate-pulse" />;
 
   const renderHeatmap = (title: string, data: MatrixResponse) => {
+    const textFlat = data.matrix.flatMap(row =>
+      row.map(v => (v === 0 ? "0.00" : v.toFixed(2)))
+    );
     return (
       <div className="w-full h-full min-h-[350px]">
         <Plot
+          key={title}
           data={[
             {
               z: data.matrix,
               x: data.tickers,
               y: data.tickers,
+              text: textFlat,
               type: "heatmap",
               colorscale: "RdBu",
               zmin: -1,
               zmax: 1,
               hoverongaps: false,
-              texttemplate: "%{z:.2f}",
+              texttemplate: "%{text}",
               showscale: false,
             },
           ]}
