@@ -5,9 +5,13 @@ import os
 from datetime import datetime
 
 TICKERS = [
-    "VOO", "QQQ", "IWM", "COWZ", "VOOG", "VOOV", "VXUS",
-    "AGG", "TLT", "IEF", "VGSH", "LQD", "HYG", "TIP",
-    "GLD", "PDBC", "USO", "VNQ", "BTC-USD",
+    # Fixed Income (low vol to high vol)
+    "VGSH", "AGG", "TIP", "IEF", "HYG", "LQD", "TLT",
+    # Equities & Real Estate
+    "GLD", "VOOV", "VXUS", "PDBC", "VOO", "COWZ",
+    "VOOG", "VNQ", "QQQ", "IWM",
+    # High vol
+    "USO", "BTC-USD",
 ]
 CRYPTO_TICKERS = ["BTC-USD"]
 START_DATE = "2016-01-01"  # COWZ started late 2016
@@ -15,9 +19,9 @@ START_DATE = "2016-01-01"  # COWZ started late 2016
 ASSET_GROUPS = {
     "all": TICKERS,
     "macro": ["VOO", "AGG", "PDBC", "GLD", "VNQ", "BTC-USD"],
-    "equities": ["VOO", "VOOG", "VOOV", "QQQ", "IWM", "COWZ", "VXUS"],
-    "fixed_income": ["AGG", "TLT", "IEF", "VGSH", "LQD", "HYG", "TIP"],
-    "commodities_alts": ["PDBC", "GLD", "USO", "BTC-USD"],
+    "equities": ["VOOV", "VXUS", "VOO", "COWZ", "VOOG", "QQQ", "IWM"],
+    "fixed_income": ["VGSH", "AGG", "TIP", "IEF", "HYG", "LQD", "TLT"],
+    "commodities_alts": ["GLD", "PDBC", "USO", "BTC-USD"],
 }
 
 class DataService:
