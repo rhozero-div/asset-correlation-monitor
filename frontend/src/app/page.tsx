@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import SummaryTable from "@/components/SummaryTable";
 import CorrelationHeatmap from "@/components/CorrelationHeatmap";
 import RollingTimeSeries from "@/components/RollingTimeSeries";
@@ -60,18 +60,28 @@ export default function Dashboard() {
     insights: null
   });
 
+  // Track the latest params to ignore stale Promise resolves
+  const loadedRef = useRef({ group: activeGroup, window: windowSize });
+
   const loadData = useCallback(async () => {
+    const group = activeGroup;
+    const win = windowSize;
+    loadedRef.current = { group, window: win };
     setLoading(true);
     try {
       const [sum, rec, lng, rCorr, rVol, anom, ins] = await Promise.all([
-        fetchSummary(activeGroup),
-        fetchRecentMatrix(windowSize, activeGroup),
-        fetchLongTermMatrix(activeGroup),
-        fetchRollingCorrelation(windowSize, activeGroup),
-        fetchRollingVolatility(60, activeGroup),
-        fetchAnomalies(windowSize, activeGroup),
-        fetchInsights(windowSize, activeGroup)
+        fetchSummary(group),
+        fetchRecentMatrix(win, group),
+        fetchLongTermMatrix(group),
+        fetchRollingCorrelation(win, group),
+        fetchRollingVolatility(60, group),
+        fetchAnomalies(win, group),
+        fetchInsights(win, group)
       ]);
+      
+      // Ignore stale responses from previous group/window
+      const current = loadedRef.current;
+      if (current.group !== group || current.window !== win) return;
       
       setData({
         summary: sum,
@@ -85,7 +95,10 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Failed to load data:", error);
     } finally {
-      setLoading(false);
+      const current = loadedRef.current;
+      if (current.group === group && current.window === win) {
+        setLoading(false);
+      }
     }
   }, [activeGroup, windowSize]);
 
