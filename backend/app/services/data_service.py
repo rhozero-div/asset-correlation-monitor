@@ -4,8 +4,21 @@ from pathlib import Path
 import os
 from datetime import datetime
 
-TICKERS = ["VOO", "QQQ", "IWM", "COWZ", "TLT", "IEF", "VGSH", "AGG", "LQD", "GLD", "PDBC"]
+TICKERS = [
+    "VOO", "QQQ", "IWM", "COWZ", "VOOG", "VOOV", "VXUS",
+    "AGG", "TLT", "IEF", "VGSH", "LQD", "HYG", "TIP",
+    "GLD", "PDBC", "USO", "VNQ", "BTC-USD",
+]
+CRYPTO_TICKERS = ["BTC-USD"]
 START_DATE = "2016-01-01"  # COWZ started late 2016
+
+ASSET_GROUPS = {
+    "all": TICKERS,
+    "macro": ["VOO", "AGG", "PDBC", "GLD", "VNQ", "BTC-USD"],
+    "equities": ["VOO", "VOOG", "VOOV", "QQQ", "IWM", "COWZ", "VXUS"],
+    "fixed_income": ["AGG", "TLT", "IEF", "VGSH", "LQD", "HYG", "TIP"],
+    "commodities_alts": ["PDBC", "GLD", "USO", "BTC-USD"],
+}
 
 class DataService:
     def __init__(self, cache_dir: str = "../cache"):
@@ -19,9 +32,16 @@ class DataService:
             self.refresh_data()
         else:
             self.load_data()
-            
+
+            # Check if the cached data has all expected tickers
+            if not self.df.empty:
+                missing = [t for t in TICKERS if t not in self.df.columns]
+                if missing:
+                    print(f"Missing tickers in cache: {missing}. Refreshing...")
+                    self.refresh_data(force=True)
+                    return
+
             # Simple check if data is reasonably fresh (within last couple of weekdays)
-            # If not, auto refresh. For simplicity, if last date is < today - 3 days.
             if not self.df.empty:
                 last_date = pd.to_datetime(self.df.index[-1]).date()
                 today = datetime.now().date()
@@ -46,27 +66,41 @@ class DataService:
                 print(f"Quick check failed: {e}")
 
         print(f"Downloading data for {len(TICKERS)} tickers...")
-        # Download all at once
-        data = yf.download(TICKERS, start=START_DATE, group_by='ticker', auto_adjust=False)
-        
-        # Extract Adj Close
-        adj_close = pd.DataFrame()
-        
-        if len(TICKERS) == 1: # Fallback if only 1 ticker
-             adj_close[TICKERS[0]] = data['Adj Close']
-        else:
-            for ticker in TICKERS:
-                if ticker in data and 'Adj Close' in data[ticker]:
-                    adj_close[ticker] = data[ticker]['Adj Close']
-                elif ('Adj Close', ticker) in data.columns: # Alternative yfinance format
-                    adj_close[ticker] = data['Adj Close', ticker]
 
-        # Forward fill missing values (e.g. holidays) and drop rows with all NAs
-        adj_close = adj_close.ffill().dropna(how='all')
-        
+        # Separate ETFs from crypto (BTC-USD has no Adj Close)
+        etf_tickers = [t for t in TICKERS if t not in CRYPTO_TICKERS]
+
+        # Download ETFs together
+        all_prices = pd.DataFrame()
+        if etf_tickers:
+            etf_data = yf.download(etf_tickers, start=START_DATE, group_by='ticker', auto_adjust=False)
+            for ticker in etf_tickers:
+                if ticker in etf_data and 'Adj Close' in etf_data[ticker]:
+                    all_prices[ticker] = etf_data[ticker]['Adj Close']
+                elif ('Adj Close', ticker) in etf_data.columns:
+                    all_prices[ticker] = etf_data['Adj Close', ticker]
+
+        # Download crypto separately (Close price, no Adj Close)
+        for ticker in CRYPTO_TICKERS:
+            try:
+                crypto_data = yf.download(ticker, start=START_DATE, auto_adjust=False, progress=False)
+                if not crypto_data.empty and 'Close' in crypto_data.columns:
+                    all_prices[ticker] = crypto_data['Close']
+            except Exception as e:
+                print(f"Failed to download {ticker}: {e}")
+
+        if all_prices.empty:
+            print("ERROR: No data downloaded!")
+            return False
+
+        # Forward fill ETFs (but not crypto which trades 24/7)
+        etf_cols = [c for c in all_prices.columns if c not in CRYPTO_TICKERS]
+        all_prices[etf_cols] = all_prices[etf_cols].ffill()
+        all_prices = all_prices.dropna(how='all')
+
         # Save to CSV
-        adj_close.to_csv(self.prices_file)
-        self.df = adj_close
+        all_prices.to_csv(self.prices_file)
+        self.df = all_prices
         print(f"Data saved to {self.prices_file}. Shape: {self.df.shape}")
         return True
         
@@ -76,11 +110,19 @@ class DataService:
                 self.refresh_data()
             else:
                 self.df = pd.read_csv(self.prices_file, index_col=0, parse_dates=True)
+                # Auto-refresh if new tickers were added to config
+                missing = [t for t in TICKERS if t not in self.df.columns]
+                if missing:
+                    print(f"Missing tickers in cache: {missing}. Refreshing...")
+                    self.refresh_data(force=True)
         return self.df
 
     def get_last_date(self) -> str:
         if self.df is not None and not self.df.empty:
             return str(self.df.index[-1].date())
         return "N/A"
+
+    def get_tickers_for_group(self, group: str) -> list:
+        return ASSET_GROUPS.get(group, TICKERS)
 
 data_service = DataService()

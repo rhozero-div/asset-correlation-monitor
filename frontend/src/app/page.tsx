@@ -1,17 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import SummaryTable from "@/components/SummaryTable";
 import CorrelationHeatmap from "@/components/CorrelationHeatmap";
 import RollingTimeSeries from "@/components/RollingTimeSeries";
 import AnomalySignals from "@/components/AnomalySignals";
 import InsightsPanel from "@/components/InsightsPanel";
-import { Activity, GitBranch, RefreshCcw, TrendingUp } from "lucide-react";
+import { Activity, GitBranch, RefreshCcw, TrendingUp, Globe, BarChart3, Banknote, Package } from "lucide-react";
 import clsx from "clsx";
 import { 
   fetchSummary, fetchRecentMatrix, fetchLongTermMatrix, 
   fetchRollingCorrelation, fetchRollingVolatility, 
-  fetchAnomalies, fetchInsights, refreshData 
+  fetchAnomalies, fetchInsights, refreshData,
+  AssetGroup
 } from "@/lib/api";
 
 import { 
@@ -21,8 +22,22 @@ import {
 
 type Tab = "overview" | "rolling" | "signals";
 
+interface GroupConfig {
+  id: AssetGroup;
+  label: string;
+  icon: React.ReactNode;
+}
+
+const GROUPS: GroupConfig[] = [
+  { id: "macro", label: "Macro", icon: <Globe size={16} /> },
+  { id: "equities", label: "Equities", icon: <BarChart3 size={16} /> },
+  { id: "fixed_income", label: "Fixed Income", icon: <Banknote size={16} /> },
+  { id: "commodities_alts", label: "Commodities", icon: <Package size={16} /> },
+];
+
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
+  const [activeGroup, setActiveGroup] = useState<AssetGroup>("macro");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [windowSize, setWindowSize] = useState(120);
@@ -45,17 +60,17 @@ export default function Dashboard() {
     insights: null
   });
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [sum, rec, lng, rCorr, rVol, anom, ins] = await Promise.all([
-        fetchSummary(),
-        fetchRecentMatrix(windowSize),
-        fetchLongTermMatrix(),
-        fetchRollingCorrelation(windowSize),
-        fetchRollingVolatility(60),
-        fetchAnomalies(windowSize),
-        fetchInsights(windowSize)
+        fetchSummary(activeGroup),
+        fetchRecentMatrix(windowSize, activeGroup),
+        fetchLongTermMatrix(activeGroup),
+        fetchRollingCorrelation(windowSize, activeGroup),
+        fetchRollingVolatility(60, activeGroup),
+        fetchAnomalies(windowSize, activeGroup),
+        fetchInsights(windowSize, activeGroup)
       ]);
       
       setData({
@@ -72,12 +87,18 @@ export default function Dashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeGroup, windowSize]);
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [windowSize]);
+  }, [loadData]);
+
+  const handleGroupChange = (group: AssetGroup) => {
+    if (group !== activeGroup) {
+      setActiveGroup(group);
+      setActiveTab("overview");
+    }
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -127,7 +148,26 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Group Navigation (Tier 1) */}
+      <div className="flex space-x-1 border-b border-border/50">
+        {GROUPS.map((g) => (
+          <button
+            key={g.id}
+            onClick={() => handleGroupChange(g.id as AssetGroup)}
+            className={clsx(
+              "flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors",
+              activeGroup === g.id
+                ? "border-accent text-accent"
+                : "border-transparent text-gray-400 hover:text-gray-300 hover:border-gray-600"
+            )}
+          >
+            {g.icon}
+            {g.label}
+          </button>
+        ))}
+      </div>
+
+      {/* View Tabs (Tier 2) */}
       <div className="flex space-x-1 border-b border-border/50">
         {[
           { id: "overview", label: "Overview", icon: Activity },

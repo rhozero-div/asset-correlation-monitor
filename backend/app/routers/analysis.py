@@ -20,34 +20,49 @@ def refresh_data():
     )
 
 @router.get("/summary", response_model=List[SummaryStat])
-def get_summary():
-    return analysis_service.get_summary_stats()
+def get_summary(group: str = Query("all", description="Asset group: all, macro, equities, fixed_income, commodities_alts")):
+    return analysis_service.get_summary_stats(group)
 
 @router.get("/rolling/correlation", response_model=RollingResponse)
-def get_rolling_correlation(window: int = Query(120, description="Rolling window size in days")):
-    data = analysis_service.get_rolling_correlation(window)
+def get_rolling_correlation(
+    window: int = Query(120, description="Rolling window size in days"),
+    group: str = Query("all", description="Asset group: all, macro, equities, fixed_income, commodities_alts")
+):
+    data = analysis_service.get_rolling_correlation(window, group)
     return RollingResponse(window=window, data=data)
 
 @router.get("/rolling/volatility", response_model=RollingResponse)
-def get_rolling_volatility(window: int = Query(60, description="Rolling window size in days")):
-    data = analysis_service.get_rolling_volatility(window)
+def get_rolling_volatility(
+    window: int = Query(60, description="Rolling window size in days"),
+    group: str = Query("all", description="Asset group: all, macro, equities, fixed_income, commodities_alts")
+):
+    data = analysis_service.get_rolling_volatility(window, group)
     return RollingResponse(window=window, data=data)
 
 @router.get("/correlation/matrix/recent", response_model=MatrixResponse)
-def get_recent_matrix(window: int = Query(120, description="Recent window size in days")):
-    tickers, matrix = analysis_service.get_correlation_matrix(window)
+def get_recent_matrix(
+    window: int = Query(120, description="Recent window size in days"),
+    group: str = Query("all", description="Asset group: all, macro, equities, fixed_income, commodities_alts")
+):
+    tickers, matrix = analysis_service.get_correlation_matrix(window, group)
     return MatrixResponse(tickers=tickers, matrix=matrix)
 
 @router.get("/correlation/matrix/long-term", response_model=MatrixResponse)
-def get_long_term_matrix():
-    tickers, matrix = analysis_service.get_correlation_matrix()
+def get_long_term_matrix(group: str = Query("all", description="Asset group: all, macro, equities, fixed_income, commodities_alts")):
+    tickers, matrix = analysis_service.get_correlation_matrix(group=group)
     return MatrixResponse(tickers=tickers, matrix=matrix)
 
 @router.get("/anomalies", response_model=List[AnomalySignal])
-def get_anomalies(window: int = Query(120, description="Rolling window size in days")):
-    return analysis_service.get_anomalies(window)
+def get_anomalies(
+    window: int = Query(120, description="Rolling window size in days"),
+    group: str = Query("all", description="Asset group: all, macro, equities, fixed_income, commodities_alts")
+):
+    return analysis_service.get_anomalies(window, group)
 
 @router.get("/insights", response_model=InsightResponse)
-def get_insights(window: int = Query(120, description="Rolling window size in days")):
-    anomalies = analysis_service.get_anomalies(window)
-    return analysis_service.generate_insights(anomalies)
+def get_insights(
+    window: int = Query(120, description="Rolling window size in days"),
+    group: str = Query("all", description="Asset group: all, macro, equities, fixed_income, commodities_alts")
+):
+    anomalies = analysis_service.get_anomalies(window, group)
+    return analysis_service.generate_insights(anomalies, group)
