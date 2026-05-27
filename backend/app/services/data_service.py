@@ -37,11 +37,17 @@ class DataService:
         else:
             self.load_data()
 
-            # Check if the cached data has all expected tickers
             if not self.df.empty:
+                # Check if the cached data has all expected tickers
                 missing = [t for t in TICKERS if t not in self.df.columns]
                 if missing:
                     print(f"Missing tickers in cache: {missing}. Refreshing...")
+                    self.refresh_data(force=True)
+                    return
+                # Check for columns that are all-NaN (yfinance batch glitch)
+                dead = [t for t in TICKERS if t in self.df.columns and self.df[t].dropna().empty]
+                if dead:
+                    print(f"Empty data columns in cache: {dead}. Refreshing...")
                     self.refresh_data(force=True)
                     return
 
@@ -76,20 +82,47 @@ class DataService:
 
         # Download ETFs together
         all_prices = pd.DataFrame()
+        failed = []
         if etf_tickers:
             etf_data = yf.download(etf_tickers, start=START_DATE, group_by='ticker', auto_adjust=False)
             for ticker in etf_tickers:
                 if ticker in etf_data and 'Adj Close' in etf_data[ticker]:
-                    all_prices[ticker] = etf_data[ticker]['Adj Close']
+                    series = etf_data[ticker]['Adj Close']
                 elif ('Adj Close', ticker) in etf_data.columns:
-                    all_prices[ticker] = etf_data['Adj Close', ticker]
+                    series = etf_data['Adj Close', ticker]
+                else:
+                    series = pd.Series(dtype=float)
+
+                if series.dropna().empty:
+                    print(f"  WARNING: {ticker} returned no data, will retry individually")
+                    failed.append(ticker)
+                else:
+                    all_prices[ticker] = series
+
+        # Retry failed tickers individually (can be flaky in batch)
+        for ticker in failed:
+            try:
+                retry_data = yf.download(ticker, start=START_DATE, auto_adjust=False, progress=False)
+                if not retry_data.empty and 'Adj Close' in retry_data.columns:
+                    series = retry_data['Adj Close']
+                    if not series.dropna().empty:
+                        all_prices[ticker] = series
+                        print(f"  Retry OK: {ticker}")
+                        continue
+                print(f"  Retry FAILED: {ticker}, will be excluded")
+            except Exception as e:
+                print(f"  Retry ERROR: {ticker}: {e}")
 
         # Download crypto separately (Close price, no Adj Close)
         for ticker in CRYPTO_TICKERS:
             try:
                 crypto_data = yf.download(ticker, start=START_DATE, auto_adjust=False, progress=False)
                 if not crypto_data.empty and 'Close' in crypto_data.columns:
-                    all_prices[ticker] = crypto_data['Close']
+                    series = crypto_data['Close']
+                    if not series.dropna().empty:
+                        all_prices[ticker] = series
+                    else:
+                        print(f"  WARNING: {ticker} returned no data")
             except Exception as e:
                 print(f"Failed to download {ticker}: {e}")
 
@@ -118,6 +151,12 @@ class DataService:
                 missing = [t for t in TICKERS if t not in self.df.columns]
                 if missing:
                     print(f"Missing tickers in cache: {missing}. Refreshing...")
+                    self.refresh_data(force=True)
+                    return self.df
+                # Auto-refresh if cached columns are all-NaN (yfinance download glitch)
+                dead = [t for t in TICKERS if t in self.df.columns and self.df[t].dropna().empty]
+                if dead:
+                    print(f"Empty data columns in cache: {dead}. Refreshing...")
                     self.refresh_data(force=True)
         return self.df
 

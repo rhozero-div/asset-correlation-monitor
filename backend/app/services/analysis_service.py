@@ -12,7 +12,13 @@ class AnalysisService:
         tickers = data_service.get_tickers_for_group(group)
         tickers = [t for t in tickers if t in df.columns]
         df = df[tickers]
-        return df.pct_change(fill_method=None).dropna(how='all')
+        returns = df.pct_change(fill_method=None)
+        # Drop tickers that have zero valid return data (yfinance glitch)
+        valid = [c for c in returns.columns if returns[c].notna().sum() > 0]
+        dropped = set(returns.columns) - set(valid)
+        if dropped:
+            print(f"Dropped tickers with no return data: {dropped}")
+        return returns[valid].dropna(how='all')
 
     def get_summary_stats(self, group: str = "all") -> List[Dict]:
         tickers = data_service.get_tickers_for_group(group)
@@ -107,7 +113,17 @@ class AnalysisService:
         if window:
             returns = returns.iloc[-window:]
 
-        corr_matrix = returns.corr().fillna(0)
+        # Filter out tickers with zero variance (all NaN returns in window)
+        valid_cols = [c for c in returns.columns if returns[c].notna().sum() > 1]
+        if len(valid_cols) != len(returns.columns):
+            dropped = set(returns.columns) - set(valid_cols)
+            print(f"Excluded {dropped} from correlation matrix (no variance in window {window})")
+            returns = returns[valid_cols]
+
+        if returns.empty or returns.shape[1] < 1:
+            return [], []
+
+        corr_matrix = returns.corr()
         tickers = corr_matrix.columns.tolist()
         matrix = corr_matrix.values.tolist()
 
