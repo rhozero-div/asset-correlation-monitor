@@ -34,6 +34,12 @@ A web-based macroeconomic asset allocation and correlation monitor. Tracks **19 
 *   **Anomaly Signals**: Z-Score based alerting for ETF pairs diverging from historical norms.
 *   **Insights Panel**: Auto-generated regime notes and allocation suggestions based on current correlations.
 *   **Stale Response Protection**: Tracks latest group/window params to ignore stale Promise resolves.
+*   **Custom Hover Tooltips**: Hovering over tickers in Summary, Forward Table, Custom Portfolio, and Anomaly Signals shows full asset definitions (e.g. "BTC" → "Bitcoin (USD)").
+
+## Recent Fixes
+
+*   **Time Series date alignment**: Fixed a bug where `iloc` positional sampling caused BTC-USD (weekend data) and ETFs (trading days only) to produce disjoint date sets, resulting in invisible lines on the Rolling Time Series chart. Now samples from the union of all dates so all series share the same x-axis.
+*   **Ticker hover definitions**: Replaced native `title` attribute (unreliable on macOS) with custom styled React tooltips across all table components.
 
 ## Local Setup
 
