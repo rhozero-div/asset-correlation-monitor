@@ -181,13 +181,24 @@ class AnalysisService:
         self._ensure_kalman()
         series = self._kalman_series.get(sensitivity, {})
         group_tickers = set(data_service.get_tickers_for_group(group))
-        res: Dict[str, List[Dict[str, float]]] = {}
+
+        # Collect pair series in this group
+        group_series: Dict[str, pd.Series] = {}
+        all_dates: set = set()
         for (t1, t2), rho_series in series.items():
             if t1 not in group_tickers or t2 not in group_tickers:
                 continue
             pair_key = f"{t1}-{t2}"
-            sampled = rho_series.iloc[::-5][::-1]
-            points = [{"date": str(idx.date()), "value": val} for idx, val in sampled.items()]
+            group_series[pair_key] = rho_series
+            all_dates.update(rho_series.index)
+
+        # Sample dates from the union so all pairs share the same x-axis
+        sampled_date_set = set(sorted(all_dates)[::5])
+
+        res: Dict[str, List[Dict[str, float]]] = {}
+        for pair_key, rho_series in group_series.items():
+            filtered = rho_series[rho_series.index.isin(sampled_date_set)]
+            points = [{"date": str(idx.date()), "value": val} for idx, val in filtered.items()]
             res[pair_key] = points
         return res
 
@@ -195,11 +206,23 @@ class AnalysisService:
         self._ensure_garch()
         tickers = data_service.get_tickers_for_group(group)
         tickers = [t for t in tickers if t in self._garch_vol]
-        res: Dict[str, List[Dict[str, float]]] = {}
+
+        # Compute annualised vol for each ticker and collect all dates
+        all_vol: Dict[str, pd.Series] = {}
+        all_dates: set = set()
         for ticker in tickers:
             vol = self._garch_vol[ticker].dropna() * np.sqrt(252)
-            sampled = vol.iloc[::-5][::-1]
-            points = [{"date": str(idx.date()), "value": val} for idx, val in sampled.items()]
+            all_vol[ticker] = vol
+            all_dates.update(vol.index)
+
+        # Sample dates from the union so all tickers share the same x-axis
+        sampled_date_set = set(sorted(all_dates)[::5])
+
+        res: Dict[str, List[Dict[str, float]]] = {}
+        for ticker in tickers:
+            vol = all_vol[ticker]
+            filtered = vol[vol.index.isin(sampled_date_set)]
+            points = [{"date": str(idx.date()), "value": val} for idx, val in filtered.items()]
             res[ticker] = points
         return res
 
