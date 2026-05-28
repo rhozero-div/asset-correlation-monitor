@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { tickerDisplay } from "@/lib/labels";
+import { tickerDisplay, TICKER_DEFINITIONS } from "@/lib/labels";
 
 interface Props {
   tickers: string[];
@@ -42,7 +42,7 @@ export default function CustomPortfolio({ tickers, onPlot }: Props) {
           <div key={t}
             className="flex items-center justify-between bg-surface/80 rounded-lg px-3 py-2 border border-border"
           >
-            <span className="text-sm font-mono text-white font-medium">{tickerDisplay(t)}</span>
+            <span className="text-sm font-mono text-white font-medium" title={TICKER_DEFINITIONS[t] ?? ""}>{tickerDisplay(t)}</span>
             <div className="flex items-center gap-1">
               <input
                 type="number" step="1" min="-100" max="200"

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { tickerDisplay } from "@/lib/labels";
+import { tickerDisplay, TICKER_DEFINITIONS } from "@/lib/labels";
 
 export interface AssetRow {
   ticker: string;
@@ -100,7 +100,7 @@ export default function ForwardTable({
           <tbody>
             {rows.map((row, idx) => (
               <tr key={row.ticker} className="border-b border-border/30 hover:bg-surface/50 transition-colors">
-                <td className="py-2.5 pr-4 font-mono font-medium text-white">{tickerDisplay(row.ticker)}</td>
+                <td className="py-2.5 pr-4 font-mono font-medium text-white" title={TICKER_DEFINITIONS[row.ticker] ?? ""}>{tickerDisplay(row.ticker)}</td>
                 <td className="py-2.5 pr-4 text-center">
                   <input
                     type="checkbox"

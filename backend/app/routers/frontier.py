@@ -2,7 +2,7 @@ from fastapi import APIRouter
 from typing import List, Optional
 import numpy as np
 
-from app.models.schemas import FrontierRequest, FrontierResponse, PortfolioPoint, AssetPoints
+from app.models.schemas import FrontierRequest, FrontierResponse, PortfolioStatsRequest, PortfolioPoint, AssetPoints
 from app.services.analysis_service import analysis_service
 from app.services.optimizer import (
     build_cov_matrix,
@@ -12,36 +12,35 @@ from app.services.optimizer import (
 
 router = APIRouter(prefix="/api/v1/frontier", tags=["Frontier"])
 
+def _get_rho_matrix(tickers: List[str]):
+    """Extract smooth Kalman correlation matrix for given tickers."""
+    analysis_service._ensure_kalman()
+    matrix_df = analysis_service._kalman_matrices.get("smooth")
+
+    if matrix_df is None or matrix_df.empty:
+        n = len(tickers)
+        return np.eye(n), ["Correlation matrix not ready. Using identity matrix."]
+
+    missing = [t for t in tickers if t not in matrix_df.columns]
+    if missing:
+        n = len(tickers)
+        rho = np.eye(n)
+        for i, t1 in enumerate(tickers):
+            for j, t2 in enumerate(tickers):
+                if t1 in matrix_df.columns and t2 in matrix_df.columns:
+                    rho[i, j] = float(matrix_df.loc[t1, t2])
+        return rho, [f"Some tickers missing from correlation cache: {missing}"]
+
+    return matrix_df.loc[tickers, tickers].values, []
+
+
 @router.post("/compute", response_model=FrontierResponse)
 async def compute_frontier(req: FrontierRequest):
     mu = np.array(req.mu)
     sigma = np.array(req.sigma)
     rf = req.rf
     
-    # Extract the smooth Kalman correlation matrix from analysis_service
-    analysis_service._ensure_kalman()
-    matrix_df = analysis_service._kalman_matrices.get("smooth")
-    
-    if matrix_df is None or matrix_df.empty:
-        # Fallback to identity matrix if not ready
-        n = len(req.tickers)
-        rho_matrix = np.eye(n)
-        warnings = ["Correlation matrix not ready. Using identity matrix."]
-    else:
-        # Filter the matrix for the requested tickers
-        missing = [t for t in req.tickers if t not in matrix_df.columns]
-        if missing:
-            # Fallback: create a matrix with 0 correlations for missing tickers
-            n = len(req.tickers)
-            rho_matrix = np.eye(n)
-            for i, t1 in enumerate(req.tickers):
-                for j, t2 in enumerate(req.tickers):
-                    if t1 in matrix_df.columns and t2 in matrix_df.columns:
-                        rho_matrix[i, j] = float(matrix_df.loc[t1, t2])
-            warnings = [f"Some tickers missing from correlation cache: {missing}"]
-        else:
-            rho_matrix = matrix_df.loc[req.tickers, req.tickers].values
-            warnings = []
+    rho_matrix, warnings = _get_rho_matrix(req.tickers)
 
     Sigma = build_cov_matrix(sigma, rho_matrix)
 
@@ -73,3 +72,20 @@ async def compute_frontier(req: FrontierRequest):
         ),
         warnings=warnings,
     )
+
+
+@router.post("/portfolio-stats", response_model=PortfolioPoint)
+async def compute_portfolio_stats(req: PortfolioStatsRequest):
+    mu = np.array(req.mu)
+    sigma = np.array(req.sigma)
+    w = np.array(req.weights) / 100.0
+    rf = req.rf
+
+    rho_matrix, _ = _get_rho_matrix(req.tickers)
+    Sigma = build_cov_matrix(sigma, rho_matrix)
+
+    ret = float(w @ mu)
+    vol = float(np.sqrt(w @ Sigma @ w))
+    sharpe = (ret - rf) / vol if vol > 1e-10 else 0.0
+
+    return PortfolioPoint(weights=req.weights, ret=ret, vol=vol, sharpe=sharpe)

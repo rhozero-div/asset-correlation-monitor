@@ -1,10 +1,12 @@
 import { 
   RefreshResponse, SummaryStat, RollingResponse, 
   MatrixResponse, AnomalySignal, InsightResponse,
-  FrontierRequest, FrontierResponse
+  FrontierRequest, FrontierResponse, PortfolioPoint,
+  PortfolioStatsRequest
 } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8012/api/v1/analysis";
+const FRONTIER_BASE = API_BASE.replace("/analysis", "/frontier");
 
 export type AssetGroup = "all" | "macro" | "equities" | "fixed_income" | "commodities_alts" | "typical_portfolio";
 export type Sensitivity = "fast" | "standard" | "smooth";
@@ -58,11 +60,21 @@ export async function fetchInsights(sensitivity: Sensitivity = "standard", group
 }
 
 export async function computeFrontier(req: FrontierRequest): Promise<FrontierResponse> {
-  const res = await fetch(`${API_BASE.replace("/analysis", "/frontier")}/compute`, {
+  const res = await fetch(`${FRONTIER_BASE}/compute`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(req)
   });
   if (!res.ok) throw new Error("Failed to compute efficient frontier");
+  return res.json();
+}
+
+export async function fetchPortfolioStats(req: PortfolioStatsRequest): Promise<PortfolioPoint> {
+  const res = await fetch(`${FRONTIER_BASE}/portfolio-stats`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(req)
+  });
+  if (!res.ok) throw new Error("Failed to compute portfolio stats");
   return res.json();
 }

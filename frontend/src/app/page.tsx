@@ -8,12 +8,14 @@ import AnomalySignals from "@/components/AnomalySignals";
 import InsightsPanel from "@/components/InsightsPanel";
 import ForwardTable, { AssetRow } from "@/components/ForwardTable";
 import FrontierPlot from "@/components/FrontierPlot";
+import CustomPortfolio from "@/components/CustomPortfolio";
 import { Activity, GitBranch, RefreshCcw, TrendingUp, Globe, BarChart3, Banknote, Package, Briefcase } from "lucide-react";
 import clsx from "clsx";
 import {
   fetchSummary, fetchRecentMatrix, fetchLongTermMatrix,
   fetchRollingCorrelation, fetchRollingVolatility,
   fetchAnomalies, fetchInsights, refreshData, computeFrontier,
+  fetchPortfolioStats,
   AssetGroup, Sensitivity
 } from "@/lib/api";
 import { TYPICAL_PORTFOLIO_TICKERS } from "@/lib/labels";
@@ -54,6 +56,10 @@ export default function Dashboard() {
   const [frontierData, setFrontierData] = useState<FrontierResponse | null>(null);
   const [computingFrontier, setComputingFrontier] = useState(false);
   const [usingSavedDefaults, setUsingSavedDefaults] = useState(false);
+  const [customPortfolio, setCustomPortfolio] = useState<{
+    ret: number; vol: number; sharpe: number; weights: Record<string, number>;
+  } | null>(null);
+  const [computingCustom, setComputingCustom] = useState(false);
 
   const [data, setData] = useState<{
     summary: SummaryStat[];
@@ -183,11 +189,12 @@ export default function Dashboard() {
     if (included.length < 2) return;
     
     setComputingFrontier(true);
+    setCustomPortfolio(null);
     try {
       const res = await computeFrontier({
         tickers: included.map(r => r.ticker),
-        mu: included.map(r => r.mu / 100.0), // convert back to decimal
-        sigma: included.map(r => r.sigma / 100.0), // convert back to decimal
+        mu: included.map(r => r.mu / 100.0),
+        sigma: included.map(r => r.sigma / 100.0),
         rf: rfRate / 100.0,
         allowShort,
         nPoints: 100
@@ -198,6 +205,30 @@ export default function Dashboard() {
       console.error("Failed to compute frontier:", error);
     } finally {
       setComputingFrontier(false);
+    }
+  };
+
+  const handlePlotCustomPortfolio = async (weights: Record<string, number>) => {
+    const included = forwardRows.filter(r => r.include);
+    if (included.length < 2 || !frontierData) return;
+
+    setComputingCustom(true);
+    try {
+      const tickers = included.map(r => r.ticker);
+      const res = await fetchPortfolioStats({
+        tickers,
+        mu: included.map(r => r.mu / 100.0),
+        sigma: included.map(r => r.sigma / 100.0),
+        weights: tickers.map(t => weights[t] ?? 0),
+        rf: rfRate / 100.0,
+      });
+      const weightsMap: Record<string, number> = {};
+      tickers.forEach((t, i) => { weightsMap[t] = res.weights[i]; });
+      setCustomPortfolio({ ...res, weights: weightsMap });
+    } catch (error) {
+      console.error("Failed to compute portfolio stats:", error);
+    } finally {
+      setComputingCustom(false);
     }
   };
 
@@ -378,8 +409,14 @@ export default function Dashboard() {
                   <div className="lg:col-span-2 space-y-6">
                     <FrontierPlot 
                       data={frontierData} 
-                      customPortfolio={null}
+                      customPortfolio={customPortfolio}
                     />
+                    {frontierData && (
+                      <CustomPortfolio
+                        tickers={forwardRows.filter(r => r.include).map(r => r.ticker)}
+                        onPlot={handlePlotCustomPortfolio}
+                      />
+                    )}
                   </div>
                 </div>
               </div>

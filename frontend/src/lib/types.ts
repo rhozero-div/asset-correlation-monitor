@@ -73,3 +73,11 @@ export interface FrontierResponse {
   assetPoints: AssetPoints;
   warnings: string[];
 }
+
+export interface PortfolioStatsRequest {
+  tickers: string[];
+  mu: number[];
+  sigma: number[];
+  weights: number[];
+  rf: number;
+}

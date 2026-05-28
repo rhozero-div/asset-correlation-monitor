@@ -48,6 +48,13 @@ class FrontierRequest(BaseModel):
     allowShort: bool = False
     nPoints: int = 100
 
+class PortfolioStatsRequest(BaseModel):
+    tickers: List[str]
+    mu: List[float]
+    sigma: List[float]
+    weights: List[float]
+    rf: float = 0.045
+
 class PortfolioPoint(BaseModel):
     weights: List[float]
     ret: float
