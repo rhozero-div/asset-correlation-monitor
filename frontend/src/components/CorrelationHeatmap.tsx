@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { MatrixResponse } from "@/lib/types";
+import { tickerDisplay } from "@/lib/labels";
 
 // Load plotly basic/cartesian dynamically to avoid 28MB bundle size
 const Plot = dynamic(() => 
@@ -34,8 +35,8 @@ export default function CorrelationHeatmap({
           data={[
             {
               z: data.matrix,
-              x: data.tickers,
-              y: data.tickers,
+              x: data.tickers.map(tickerDisplay),
+              y: data.tickers.map(tickerDisplay),
               type: "heatmap",
               colorscale: "RdBu",
               zmin: -1,

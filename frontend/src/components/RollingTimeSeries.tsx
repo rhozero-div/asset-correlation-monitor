@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { RollingResponse } from "@/lib/types";
+import { tickerDisplay } from "@/lib/labels";
 import {
   LineChart,
   Line,
@@ -118,7 +119,7 @@ export default function RollingTimeSeries({ corrData, volData, tickers }: Props)
               onChange={(e) => setBaseAsset(e.target.value)}
             >
               {tickers.map((t) => (
-                <option key={t} value={t}>{t}</option>
+                <option key={t} value={t}>{tickerDisplay(t)}</option>
               ))}
             </select>
           )}
@@ -127,7 +128,7 @@ export default function RollingTimeSeries({ corrData, volData, tickers }: Props)
 
       {metric === "correlation" && baseAsset && (
         <p className="text-xs text-gray-500 mb-4">
-          Correlation vs <span className="text-accent font-medium">{baseAsset}</span>
+          Correlation vs <span className="text-accent font-medium">{tickerDisplay(baseAsset)}</span>
         </p>
       )}
 
@@ -161,7 +162,7 @@ export default function RollingTimeSeries({ corrData, volData, tickers }: Props)
                   stroke={COLORS[idx % COLORS.length]}
                   strokeWidth={2}
                   dot={false}
-                  name={key}
+                  name={tickerDisplay(key)}
                 />
               ))}
               {metric === "correlation" && (

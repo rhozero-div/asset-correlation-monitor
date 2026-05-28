@@ -1,4 +1,5 @@
 import { SummaryStat } from "@/lib/types";
+import { tickerDisplay } from "@/lib/labels";
 
 export default function SummaryTable({ data }: { data: SummaryStat[] }) {
   const formatPct = (val: number | null) => {
@@ -25,7 +26,7 @@ export default function SummaryTable({ data }: { data: SummaryStat[] }) {
         <tbody>
           {data.map((row) => (
             <tr key={row.ticker} className="border-b border-border/30 hover:bg-surface-light/50 transition-colors">
-              <td className="px-4 py-3 font-medium text-white">{row.ticker}</td>
+              <td className="px-4 py-3 font-medium text-white">{tickerDisplay(row.ticker)}</td>
               <td className={`px-4 py-3 mono ${row.cagr_ytd && row.cagr_ytd >= 0 ? "text-accent" : "text-accent-red"}`}>
                 {formatPct(row.cagr_ytd)}
               </td>

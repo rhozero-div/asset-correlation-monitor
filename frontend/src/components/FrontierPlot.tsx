@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { FrontierResponse } from "@/lib/types";
+import { tickerDisplay } from "@/lib/labels";
 
 // Load plotly dynamically to avoid bundle size issues
 const Plot = dynamic(() => 
@@ -35,7 +36,7 @@ export default function FrontierPlot({ data, customPortfolio }: Props) {
   const formatWeights = (weights: number[], tickers: string[]) => {
     if (!weights || weights.length !== tickers.length) return "";
     return tickers
-      .map((t, i) => `${t}: ${(weights[i] * 100).toFixed(1)}%`)
+      .map((t, i) => `${tickerDisplay(t)}: ${(weights[i] * 100).toFixed(1)}%`)
       .filter((_, i) => weights[i] > 0.005 || weights[i] < -0.005) // hide tiny weights
       .join("<br>");
   };
@@ -85,7 +86,7 @@ export default function FrontierPlot({ data, customPortfolio }: Props) {
       mode: "markers+text",
       name: "Assets",
       marker: { symbol: "circle", size: 8, color: "#6b7280" },
-      text: assetPoints.tickers,
+      text: assetPoints.tickers.map(tickerDisplay),
       textposition: "top center",
       textfont: { color: "#9ca3af" },
       hovertemplate: "<b>%{text}</b><br>Vol: %{x:.2%}<br>Ret: %{y:.2%}<extra></extra>",
