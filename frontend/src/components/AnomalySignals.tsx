@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { AnomalySignal } from "@/lib/types";
 import { tickerDisplay, pairDefinitions } from "@/lib/labels";
 
 export default function AnomalySignals({ signals }: { signals: AnomalySignal[] }) {
+  const [hovered, setHovered] = useState<string | null>(null);
+
   if (!signals || signals.length === 0) return null;
 
   return (
@@ -29,7 +32,18 @@ export default function AnomalySignals({ signals }: { signals: AnomalySignal[] }
 
             return (
               <tr key={sig.pair} className="border-b border-border/30 hover:bg-surface-light/50 transition-colors">
-                <td className="px-4 py-3 font-medium text-white" title={pairDefinitions(sig.pair)}>{tickerDisplay(sig.pair)}</td>
+                <td
+                  className="px-4 py-3 font-medium text-white relative cursor-default"
+                  onMouseEnter={() => setHovered(sig.pair)}
+                  onMouseLeave={() => setHovered(null)}
+                >
+                  {tickerDisplay(sig.pair)}
+                  {hovered === sig.pair && (
+                    <span className="absolute left-0 top-full z-20 mt-1 px-3 py-1.5 rounded-lg text-xs font-normal whitespace-nowrap bg-gray-900 border border-border text-gray-200 shadow-lg pointer-events-none">
+                      {pairDefinitions(sig.pair)}
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-3 mono">{sig.current_corr.toFixed(3)}</td>
                 <td className="px-4 py-3 mono text-gray-400">{sig.mean_corr.toFixed(3)}</td>
                 <td className="px-4 py-3 mono font-medium">{sig.z_score.toFixed(2)}</td>
