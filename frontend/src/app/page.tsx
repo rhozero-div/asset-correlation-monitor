@@ -16,6 +16,7 @@ import {
   fetchAnomalies, fetchInsights, refreshData, computeFrontier,
   AssetGroup, Sensitivity
 } from "@/lib/api";
+import { TYPICAL_PORTFOLIO_TICKERS } from "@/lib/labels";
 
 import {
   SummaryStat, MatrixResponse, RollingResponse,
@@ -140,7 +141,7 @@ export default function Dashboard() {
       setForwardRows(data.summary.map(s => ({
         ticker: s.ticker,
         name: s.ticker,
-        include: true,
+        include: TYPICAL_PORTFOLIO_TICKERS.includes(s.ticker),
         mu: s.cagr_all !== null ? parseFloat((s.cagr_all * 100).toFixed(2)) : 5.0,
         sigma: s.vol_all !== null ? parseFloat((s.vol_all * 100).toFixed(2)) : 15.0,
       })));

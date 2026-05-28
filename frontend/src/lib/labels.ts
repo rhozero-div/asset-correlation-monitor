@@ -9,3 +9,7 @@ export function tickerDisplay(ticker: string): string {
   }
   return result;
 }
+
+export const TYPICAL_PORTFOLIO_TICKERS = [
+  "VOO", "QQQ", "COWZ", "VGSH", "LQD", "TLT", "GLD", "PDBC", "BTC-USD",
+];
