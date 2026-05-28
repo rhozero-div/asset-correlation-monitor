@@ -6,9 +6,10 @@ import { tickerDisplay, TICKER_DEFINITIONS } from "@/lib/labels";
 interface Props {
   tickers: string[];
   onPlot: (weights: Record<string, number>) => void;
+  computing?: boolean;
 }
 
-export default function CustomPortfolio({ tickers, onPlot }: Props) {
+export default function CustomPortfolio({ tickers, onPlot, computing = false }: Props) {
   const n = tickers.length;
   const [weights, setWeights] = useState<number[]>([]);
 
@@ -58,14 +59,14 @@ export default function CustomPortfolio({ tickers, onPlot }: Props) {
 
       <button
         className="btn btn-primary w-full"
-        disabled={!isValid}
+        disabled={!isValid || computing}
         onClick={() => {
           const wts: Record<string, number> = {};
           tickers.forEach((t, i) => { wts[t] = weights[i]; });
           onPlot(wts);
         }}
       >
-        Plot Your Portfolio on Frontier
+        {computing ? "Computing..." : "Plot Your Portfolio on Frontier"}
       </button>
     </div>
   );

@@ -415,6 +415,7 @@ export default function Dashboard() {
                       <CustomPortfolio
                         tickers={forwardRows.filter(r => r.include).map(r => r.ticker)}
                         onPlot={handlePlotCustomPortfolio}
+                        computing={computingCustom}
                       />
                     )}
                   </div>
