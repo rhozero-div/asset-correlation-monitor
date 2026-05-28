@@ -65,10 +65,10 @@ export default function CorrelationHeatmap({
       <h3 className="text-xl font-semibold mb-2 text-accent">Correlation Matrices</h3>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="rounded border border-border p-2 bg-surface">
-          {renderHeatmap("Fast Sensitivity (高敏)", recent)}
+          {renderHeatmap("Fast Sensitivity", recent)}
         </div>
         <div className="rounded border border-border p-2 bg-surface">
-          {renderHeatmap("Smooth Sensitivity (平滑)", longTerm)}
+          {renderHeatmap("Smooth Sensitivity", longTerm)}
         </div>
       </div>
     </div>

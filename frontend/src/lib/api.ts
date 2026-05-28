@@ -6,7 +6,7 @@ import {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8012/api/v1/analysis";
 
-export type AssetGroup = "all" | "macro" | "equities" | "fixed_income" | "commodities_alts";
+export type AssetGroup = "all" | "macro" | "equities" | "fixed_income" | "commodities_alts" | "typical_portfolio";
 export type Sensitivity = "fast" | "standard" | "smooth";
 
 export async function refreshData(): Promise<RefreshResponse> {

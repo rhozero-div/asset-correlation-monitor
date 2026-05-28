@@ -22,6 +22,7 @@ ASSET_GROUPS = {
     "equities": ["VOOV", "VXUS", "VOO", "COWZ", "VOOG", "QQQ", "IWM"],
     "fixed_income": ["VGSH", "AGG", "TIP", "IEF", "HYG", "LQD", "TLT"],
     "commodities_alts": ["GLD", "PDBC", "USO", "BTC-USD"],
+    "typical_portfolio": ["VOO", "QQQ", "COWZ", "VGSH", "LQD", "TLT", "GLD", "PDBC", "BTC-USD"],
 }
 
 class DataService:

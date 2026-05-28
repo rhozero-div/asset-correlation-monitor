@@ -8,7 +8,7 @@ import AnomalySignals from "@/components/AnomalySignals";
 import InsightsPanel from "@/components/InsightsPanel";
 import ForwardTable, { AssetRow } from "@/components/ForwardTable";
 import FrontierPlot from "@/components/FrontierPlot";
-import { Activity, GitBranch, RefreshCcw, TrendingUp, Globe, BarChart3, Banknote, Package } from "lucide-react";
+import { Activity, GitBranch, RefreshCcw, TrendingUp, Globe, BarChart3, Banknote, Package, Briefcase } from "lucide-react";
 import clsx from "clsx";
 import {
   fetchSummary, fetchRecentMatrix, fetchLongTermMatrix,
@@ -35,7 +35,8 @@ const GROUPS: GroupConfig[] = [
   { id: "macro", label: "Macro", icon: <Globe size={16} /> },
   { id: "equities", label: "Equities", icon: <BarChart3 size={16} /> },
   { id: "fixed_income", label: "Fixed Income", icon: <Banknote size={16} /> },
-  { id: "commodities_alts", label: "Commodities", icon: <Package size={16} /> },
+  { id: "commodities_alts", label: "Alternatives", icon: <Package size={16} /> },
+  { id: "typical_portfolio", label: "Typical Portfolio", icon: <Briefcase size={16} /> },
 ];
 
 export default function Dashboard() {
