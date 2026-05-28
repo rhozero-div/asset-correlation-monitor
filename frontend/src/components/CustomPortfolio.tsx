@@ -43,7 +43,7 @@ export default function CustomPortfolio({ tickers, onPlot, computing = false }: 
           <div key={t}
             className="flex items-center justify-between bg-surface/80 rounded-lg px-3 py-2 border border-border"
           >
-            <span className="text-sm font-mono text-white font-medium" title={TICKER_DEFINITIONS[t] ?? ""}>{tickerDisplay(t)}</span>
+            <span className="text-sm font-mono text-white font-medium" title={TICKER_DEFINITIONS[t] ?? t}>{tickerDisplay(t)}</span>
             <div className="flex items-center gap-1">
               <input
                 type="number" step="1" min="-100" max="200"
