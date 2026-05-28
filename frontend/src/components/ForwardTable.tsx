@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { tickerDisplay, TICKER_DEFINITIONS } from "@/lib/labels";
 
 export interface AssetRow {
@@ -28,6 +28,7 @@ interface Props {
 export default function ForwardTable({
   rows, rfRate, allowShort, onRowsChange, onRfChange, onAllowShortChange, onAutoFill, onSaveDefaults, onCompute, computing, usingSavedDefaults
 }: Props) {
+  const [hovered, setHovered] = useState<string | null>(null);
   const updateRow = (idx: number, patch: Partial<AssetRow>) => {
     const next = [...rows];
     next[idx] = { ...next[idx], ...patch };
@@ -100,7 +101,18 @@ export default function ForwardTable({
           <tbody>
             {rows.map((row, idx) => (
               <tr key={row.ticker} className="border-b border-border/30 hover:bg-surface/50 transition-colors">
-                <td className="py-2.5 pr-4 font-mono font-medium text-white" title={TICKER_DEFINITIONS[row.ticker] ?? row.ticker}>{tickerDisplay(row.ticker)}</td>
+                <td
+                  className="py-2.5 pr-4 font-mono font-medium text-white relative cursor-default"
+                  onMouseEnter={() => setHovered(row.ticker)}
+                  onMouseLeave={() => setHovered(null)}
+                >
+                  {tickerDisplay(row.ticker)}
+                  {hovered === row.ticker && (
+                    <span className="absolute left-0 top-full z-20 mt-1 px-3 py-1.5 rounded-lg text-xs font-normal whitespace-nowrap bg-gray-900 border border-border text-gray-200 shadow-lg pointer-events-none">
+                      {TICKER_DEFINITIONS[row.ticker] ?? row.ticker}
+                    </span>
+                  )}
+                </td>
                 <td className="py-2.5 pr-4 text-center">
                   <input
                     type="checkbox"

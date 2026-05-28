@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { SummaryStat } from "@/lib/types";
 import { tickerDisplay, TICKER_DEFINITIONS } from "@/lib/labels";
 
 export default function SummaryTable({ data }: { data: SummaryStat[] }) {
+  const [hovered, setHovered] = useState<string | null>(null);
+
   const formatPct = (val: number | null) => {
     if (val === null) return "-";
     return (val * 100).toFixed(2) + "%";
@@ -26,7 +29,18 @@ export default function SummaryTable({ data }: { data: SummaryStat[] }) {
         <tbody>
           {data.map((row) => (
             <tr key={row.ticker} className="border-b border-border/30 hover:bg-surface-light/50 transition-colors">
-              <td className="px-4 py-3 font-medium text-white" title={TICKER_DEFINITIONS[row.ticker] ?? row.ticker}>{tickerDisplay(row.ticker)}</td>
+              <td
+                className="px-4 py-3 font-medium text-white relative cursor-default"
+                onMouseEnter={() => setHovered(row.ticker)}
+                onMouseLeave={() => setHovered(null)}
+              >
+                {tickerDisplay(row.ticker)}
+                {hovered === row.ticker && (
+                  <span className="absolute left-0 top-full z-20 mt-1 px-3 py-1.5 rounded-lg text-xs font-normal whitespace-nowrap bg-gray-900 border border-border text-gray-200 shadow-lg pointer-events-none">
+                    {TICKER_DEFINITIONS[row.ticker] ?? row.ticker}
+                  </span>
+                )}
+              </td>
               <td className={`px-4 py-3 mono ${row.cagr_ytd && row.cagr_ytd >= 0 ? "text-accent" : "text-accent-red"}`}>
                 {formatPct(row.cagr_ytd)}
               </td>

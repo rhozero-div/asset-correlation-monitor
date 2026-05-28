@@ -12,6 +12,7 @@ interface Props {
 export default function CustomPortfolio({ tickers, onPlot, computing = false }: Props) {
   const n = tickers.length;
   const [weights, setWeights] = useState<number[]>([]);
+  const [hovered, setHovered] = useState<string | null>(null);
 
   // Initialize or reset weights when tickers change
   useEffect(() => {
@@ -43,7 +44,18 @@ export default function CustomPortfolio({ tickers, onPlot, computing = false }: 
           <div key={t}
             className="flex items-center justify-between bg-surface/80 rounded-lg px-3 py-2 border border-border"
           >
-            <span className="text-sm font-mono text-white font-medium" title={TICKER_DEFINITIONS[t] ?? t}>{tickerDisplay(t)}</span>
+            <span
+              className="text-sm font-mono text-white font-medium relative cursor-default"
+              onMouseEnter={() => setHovered(t)}
+              onMouseLeave={() => setHovered(null)}
+            >
+              {tickerDisplay(t)}
+              {hovered === t && (
+                <span className="absolute left-0 top-full z-20 mt-1 px-3 py-1.5 rounded-lg text-xs font-normal whitespace-nowrap bg-gray-900 border border-border text-gray-200 shadow-lg pointer-events-none">
+                  {TICKER_DEFINITIONS[t] ?? t}
+                </span>
+              )}
+            </span>
             <div className="flex items-center gap-1">
               <input
                 type="number" step="1" min="-100" max="200"
